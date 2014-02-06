@@ -1,13 +1,15 @@
 package xdzk;
 
+import java.io.File;
+import java.lang.reflect.Method;
+import java.util.Properties;
+import java.util.UUID;
+
 import org.apache.zookeeper.server.ServerConfig;
 import org.apache.zookeeper.server.ZooKeeperServerMain;
 import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.lang.reflect.Method;
-import java.util.Properties;
 
 /**
  * Helper class to start an embedded instance of standalone (non clustered)
@@ -16,6 +18,7 @@ import java.util.Properties;
  * @author Patrick Peralta
  */
 public class ZooKeeperEmbedded {
+
 	/**
 	 * Logger.
 	 */
@@ -37,11 +40,10 @@ public class ZooKeeperEmbedded {
 	private static volatile ZooKeeperServerMain zkServer;
 
 	/**
-	 * Exception thrown while running the ZooKeeper server.
-	 * This will be {@code null} if no exceptions are thrown.
+	 * Exception thrown while running the ZooKeeper server. This will be
+	 * {@code null} if no exceptions are thrown.
 	 */
 	private static volatile Exception zkException;
-
 
 	/**
 	 * Runnable implementation that starts the ZooKeeper server.
@@ -49,10 +51,12 @@ public class ZooKeeperEmbedded {
 	private static class ServerRunnable implements Runnable {
 		@Override
 		public void run() {
-
 			try {
 				Properties properties = new Properties();
-				properties.setProperty("dataDir", System.getProperty("java.io.tmpdir"));
+				File file = new File(System.getProperty("java.io.tmpdir")
+						+ File.pathSeparator + UUID.randomUUID());
+				file.deleteOnExit();
+				properties.setProperty("dataDir", file.getAbsolutePath());
 				properties.setProperty("clientPort", String.valueOf(PORT));
 
 				QuorumPeerConfig quorumPeerConfig = new QuorumPeerConfig();
@@ -74,8 +78,8 @@ public class ZooKeeperEmbedded {
 	/**
 	 * Start the ZooKeeper server in a background thread.
 	 * <p>
-	 * If an exception is thrown during startup or execution, it
-	 * will be made available via {@link #getException}.
+	 * If an exception is thrown during startup or execution, it will be made
+	 * available via {@link #getException}.
 	 */
 	public static synchronized void start() {
 		if (zkServerThread == null) {
@@ -118,13 +122,13 @@ public class ZooKeeperEmbedded {
 	}
 
 	/**
-	 * Return the exception thrown (if any) when starting the
-	 * ZooKeeper server.
+	 * Return the exception thrown (if any) when starting the ZooKeeper server.
 	 *
-	 * @return exception thrown when starting ZooKeeper or
-	 *         {@code null} if no exception was thrown
+	 * @return exception thrown when starting ZooKeeper or {@code null} if no
+	 *         exception was thrown
 	 */
 	public static Exception getException() {
 		return zkException;
 	}
+
 }
