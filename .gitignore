@@ -2,6 +2,7 @@
 out
 bin
 build
+classes
 .classpath
 .gradle/
 .idea/
