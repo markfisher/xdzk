@@ -120,6 +120,9 @@ public class Admin extends AbstractServer {
 
 			Set<String> arrived = new HashSet<>();
 			Set<String> departed = new HashSet<>();
+			if (children == null) {
+				children = Collections.emptyList();
+			}
 
 			for (String child : children) {
 				if (!containerPaths.contains(child)) {
