@@ -12,6 +12,9 @@ import org.apache.zookeeper.ZooKeeper;
  */
 public enum Path {
 
+	// base path where admin nodes compete for leadership
+	ADMIN("/admin", CreateMode.EPHEMERAL),
+
 	// base path where container nodes register themselves
 	CONTAINERS("/containers", CreateMode.PERSISTENT),
 

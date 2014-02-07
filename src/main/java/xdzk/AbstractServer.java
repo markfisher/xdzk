@@ -1,5 +1,7 @@
 package xdzk;
 
+import java.util.UUID;
+
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
@@ -18,6 +20,11 @@ public abstract class AbstractServer implements Runnable {
 	 * Logger.
 	 */
 	private static final Logger LOG = LoggerFactory.getLogger(AbstractServer.class);
+
+	/**
+	 * Unique id string for this Server.
+	 */
+	private final String id;
 
 	/**
 	 * ZooKeeper client.
@@ -48,6 +55,16 @@ public abstract class AbstractServer implements Runnable {
 	 */
 	AbstractServer(String hostPort) {
 		this.hostPort = hostPort;
+		this.id = UUID.randomUUID().toString();
+	}
+
+	/**
+	 * Provide subclasses with access to the unique ID.
+	 *
+	 * @return this Server's unique ID.
+	 */
+	protected String getId() {
+		return this.id;
 	}
 
 	/**
