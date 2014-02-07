@@ -116,7 +116,7 @@ public class Admin extends AbstractServer {
 		 */
 		@Override
 		public void processResult(int rc, String path, Object ctx, List<String> children) {
-			LOG.info(">> PathCallback result: {}, {}, {}, {}", new Object[]{rc, path, ctx, children});
+			LOG.info(">> PathCallback result: {}, {}, {}, {}", rc, path, ctx, children);
 
 			Set<String> arrived = new HashSet<>();
 			Set<String> departed = new HashSet<>();
@@ -154,8 +154,7 @@ public class Admin extends AbstractServer {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-		Admin admin = new Admin(args.length == 1 ? args[0] : "localhost:2181");
-		admin.run();
+		new Admin(args.length == 1 ? args[0] : "localhost:2181").run();
 	}
 
 }
