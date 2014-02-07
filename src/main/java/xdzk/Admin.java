@@ -1,9 +1,12 @@
 package xdzk;
 
+import java.io.Serializable;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.WatchedEvent;
@@ -44,6 +47,13 @@ public class Admin extends AbstractServer {
 	// Marked as volatile because this reference is updated by the
 	// ZK event dispatch thread and is read by public method getContainerPaths
 	private volatile Set<String> containerPaths = Collections.emptySet();
+
+	/**
+	 * Singleton instance of the Admin server.
+	 */
+	// Marked as volatile because this reference is updated by the
+	// main thread and is read by the CurrentContainers callable.
+	public static volatile Admin INSTANCE;
 
 
 	/**
@@ -148,6 +158,16 @@ public class Admin extends AbstractServer {
 	}
 
 	/**
+	 * Callable implementation that returns the known container paths.
+	 */
+	public static class CurrentContainers implements Callable<Collection<String>>, Serializable {
+		@Override
+		public Collection<String> call() throws Exception {
+			return INSTANCE.getContainerPaths();
+		}
+	}
+
+	/**
 	 * Start an Admin server. A ZooKeeper host:port may be optionally
 	 * passed in as an argument. The default ZooKeeper host/port is
 	 * {@code localhost:2181}.
@@ -157,7 +177,8 @@ public class Admin extends AbstractServer {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-		new Admin(args.length == 1 ? args[0] : "localhost:2181").run();
+		INSTANCE = new Admin(args.length == 1 ? args[0] : "localhost:2181");
+		INSTANCE.run();
 	}
 
 }
