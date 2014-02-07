@@ -25,8 +25,16 @@ public class Container extends AbstractServer {
 	 */
 	private static final Logger LOG = LoggerFactory.getLogger(Container.class);
 
+	/**
+	 * Unique id string for this Container.
+	 */
 	private final String id;
 
+	/**
+	 * Construct a Container.
+	 *
+	 * @param hostPort host name and port number in the format {@code host:port}.
+	 */
 	public Container(String hostPort) {
 		super(hostPort);
 		this.id = UUID.randomUUID().toString();
@@ -36,14 +44,16 @@ public class Container extends AbstractServer {
 	public void doStart() throws Exception {
 		ZooKeeper zk = this.getClient();
 		Path.CONTAINERS.verify(zk);
+
 		Map<String, String> attributes = new HashMap<>();
-		String mxbeanName = ManagementFactory.getRuntimeMXBean().getName();
-		String tokens[] = mxbeanName.split("@");
+		String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
+		String tokens[] = mxBeanName.split("@");
 		attributes.put("pid", tokens[0]);
 		attributes.put("host", tokens[1]);
+
 		zk.create(Path.CONTAINERS + "/" + id, attributes.toString().getBytes(),
 				ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-		LOG.info("started container [" + id + "] with attributes: " + attributes);
+		LOG.info("started container {} with attributes: {} ", id, attributes);
 	}
 
 	/**
@@ -56,8 +66,7 @@ public class Container extends AbstractServer {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-		Container container = new Container(args.length == 1 ? args[0] : "localhost:2181");
-		container.run();
+		new Container(args.length == 1 ? args[0] : "localhost:2181").run();
 	}
 
 }
