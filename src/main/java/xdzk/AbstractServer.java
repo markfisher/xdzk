@@ -66,12 +66,22 @@ public abstract class AbstractServer implements Runnable {
 	}
 
 	/**
-	 * Method that concrete Server subclasses should implement for any actions
+	 * Method that concrete Server subclasses must implement for any actions
 	 * they need to take on startup.
 	 *
 	 * @throws Exception
 	 */
 	protected abstract void doStart() throws Exception;
+
+	/**
+	 * Method that concrete Server subclasses can override for processing watch events.
+	 * This default implementation simply logs each event at info level.
+	 *
+	 * @param event the watched event to be processed
+	 */
+	protected void processEvent(WatchedEvent event) {
+		LOG.info(">>> ZooKeeperWatcher event: {}", event);
+	}
 
 	/**
 	 * Stops the server.
@@ -99,7 +109,7 @@ public abstract class AbstractServer implements Runnable {
 
 		@Override
 		public void process(WatchedEvent event) {
-			LOG.info(">>> ZooKeeperWatcher event: {}", event);
+			processEvent(event);
 		}
 	}
 

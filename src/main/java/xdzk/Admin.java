@@ -8,6 +8,7 @@ import java.util.Set;
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +63,14 @@ public class Admin extends AbstractServer {
 	@Override
 	protected void doStart() throws InterruptedException {
 		Path.CONTAINERS.verify(this.getClient());
-		watchChildren();
+	}
+
+	@Override
+	protected void processEvent(WatchedEvent event) {
+		super.processEvent(event);
+		if (KeeperState.SyncConnected.equals(event.getState())) {
+			watchChildren();
+		}
 	}
 
 	/**
