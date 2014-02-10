@@ -15,7 +15,6 @@ import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
-import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
@@ -23,17 +22,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Prototype implementation of an XD Admin server that watches ZooKeeper
- * for Container arrivals and departures from the XD cluster. Each Admin
+ * Prototype implementation of an XD admin server that watches ZooKeeper
+ * for Container arrivals and departures from the XD cluster. Each AdminServer
  * instance will attempt to request leadership, but at any given time only
- * one Admin instance in the cluster will have leadership status. Those
+ * one AdminServer instance in the cluster will have leadership status. Those
  * instances not elected will watch the {@code /xd/admin} znode so that one
- * of them will take over leadership if the leader Admin closes or crashes.
+ * of them will take over leadership if the leader admin closes or crashes.
  *
  * @author Patrick Peralta
  * @author Mark Fisher
  */
-public class Admin extends AbstractServer {
+public class AdminServer extends AbstractServer {
 
 	/**
 	 * Logger.
@@ -47,7 +46,7 @@ public class Admin extends AbstractServer {
 	}
 
 	/**
-	 * Current status of this Admin server instance.
+	 * Current status of this AdminServer instance.
 	 */
 	private volatile LeadershipStatus status;
 
@@ -97,7 +96,7 @@ public class Admin extends AbstractServer {
 	 */
 	// Marked as volatile because this reference is updated by the
 	// main thread and is read by the CurrentContainers callable.
-	public static volatile Admin INSTANCE;
+	public static volatile AdminServer INSTANCE;
 
 
 	/**
@@ -105,7 +104,7 @@ public class Admin extends AbstractServer {
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
 	 */
-	public Admin(String hostPort) {
+	public AdminServer(String hostPort) {
 		super(hostPort);
 	}
 
@@ -125,28 +124,25 @@ public class Admin extends AbstractServer {
 	 */
 	@Override
 	protected void doStart() throws InterruptedException {
-		ZooKeeper zk = this.getClient();
-		Path.CONTAINERS.verify(zk);
+		Path.CONTAINERS.verify(this.getClient());
 	}
 
 	/**
-	 * Processes WatchedEvents from the ZooKeeper client. Specifically,
-	 * reacts to connection events by requesting leadership and
+	 * Processes SyncConnected WatchedEvents from the ZooKeeper client.
+	 * Specifically, reacts to connection events by requesting leadership and
 	 * establishing a watch for container nodes.
 	 */
 	@Override
-	protected void processEvent(WatchedEvent event) {
-		super.processEvent(event);
-		if (KeeperState.SyncConnected.equals(event.getState())) {
-			requestLeadership();
-			watchContainers();
-		}
+	protected void onConnect(WatchedEvent event) {
+		LOG.info("Admin {} CONNECTED", this.getId());
+		requestLeadership();
+		watchContainers();
 	}
 
 	/**
 	 * Asynchronously request leadership by attempting to write to {@code /xd/admin}.
 	 *
-	 * @see xdzk.Admin.LeadershipRequestCallback
+	 * @see xdzk.AdminServer.LeadershipRequestCallback
 	 */
 	private void requestLeadership() {
 		getClient().create(Path.ADMIN.toString(), this.getId().getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, leadershipRequestCallback, null);
@@ -155,7 +151,7 @@ public class Admin extends AbstractServer {
 	/**
 	 * Asynchronously obtain a list of children under {@code /xd/containers}.
 	 *
-	 * @see xdzk.Admin.ContainerPathCallback
+	 * @see xdzk.AdminServer.ContainerPathCallback
 	 */
 	protected void watchContainers() {
 		getClient().getChildren(Path.CONTAINERS.toString(), containerPathWatcher, containerPathCallback, null);
@@ -172,7 +168,7 @@ public class Admin extends AbstractServer {
 	/**
 	 * Asynchronously attempt to get data from the {@code /xd/admin} znode.
 	 *
-	 * @see xdzk.Admin.LeadershipCheckCallback
+	 * @see xdzk.AdminServer.LeadershipCheckCallback
 	 */
 	private void checkLeadership() {
 		getClient().getData(Path.ADMIN.toString(), false, leadershipCheckCallback, null);
@@ -181,8 +177,8 @@ public class Admin extends AbstractServer {
 	/**
 	 * Asynchronously check for the existence of the {@code /xd/admin} znode.
 	 *
-	 * @see xdzk.Admin.AdminPathWatcher
-	 * @see xdzk.Admin.LeaderExistsCallback
+	 * @see xdzk.AdminServer.AdminPathWatcher
+	 * @see xdzk.AdminServer.LeaderExistsCallback
 	 */
 	private void leaderExists() {
 		getClient().exists(Path.ADMIN.toString(), adminPathWatcher, leaderExistsCallback, null);
@@ -351,7 +347,7 @@ public class Admin extends AbstractServer {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-		INSTANCE = new Admin(args.length == 1 ? args[0] : "localhost:2181");
+		INSTANCE = new AdminServer(args.length == 1 ? args[0] : "localhost:2181");
 		INSTANCE.run();
 	}
 

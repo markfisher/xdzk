@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,13 +92,23 @@ public abstract class AbstractServer implements Runnable {
 	protected abstract void doStart() throws Exception;
 
 	/**
-	 * Method that concrete Server subclasses can override for processing watch events.
+	 * Method that concrete Server subclasses can override for processing watch connect events.
 	 * This default implementation simply logs each event at info level.
 	 *
 	 * @param event the watched event to be processed
 	 */
-	protected void processEvent(WatchedEvent event) {
-		LOG.info(">>> ZooKeeperWatcher event: {}", event);
+	protected void onConnect(WatchedEvent event) {
+		LOG.info(">>> ZooKeeperWatcher connected event: {}", event);
+	}
+
+	/**
+	 * Method that concrete Server subclasses can override for processing watch disconnected events.
+	 * This default implementation simply logs each event at info level.
+	 *
+	 * @param event the watched event to be processed
+	 */
+	protected void onDisconnect(WatchedEvent event) {
+		LOG.info(">>> ZooKeeperWatcher disconnected event: {}", event);
 	}
 
 	/**
@@ -126,7 +137,20 @@ public abstract class AbstractServer implements Runnable {
 
 		@Override
 		public void process(WatchedEvent event) {
-			processEvent(event);
+			if (KeeperState.SyncConnected.equals(event.getState())) {
+				onConnect(event);
+			}
+			else if (KeeperState.Disconnected.equals(event.getState())) {
+				LOG.info("Server {} DISCONNECTED", getId());
+				try {
+					getClient().close();
+					start();
+				}
+				catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+				onDisconnect(event);
+			}
 		}
 	}
 

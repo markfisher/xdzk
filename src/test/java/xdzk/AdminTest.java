@@ -39,7 +39,7 @@ public class AdminTest {
 	@Test
 	public void simpleAdminTest() throws Exception {
 		String classpath = System.getProperty("java.class.path");
-		SimpleJavaApplicationSchema schema = new SimpleJavaApplicationSchema(Admin.class.getName(), classpath);
+		SimpleJavaApplicationSchema schema = new SimpleJavaApplicationSchema(AdminServer.class.getName(), classpath);
 		NativeJavaApplicationBuilder<SimpleJavaApplication, SimpleJavaApplicationSchema> builder =
 				new NativeJavaApplicationBuilder<>();
 		JavaApplication<SimpleJavaApplication> admin = builder.realize(schema, "Admin Server",
@@ -57,7 +57,7 @@ public class AdminTest {
 		final CountDownLatch latch = new CountDownLatch(1);
 		final AtomicReference<Exception> exception = new AtomicReference<>();
 
-		admin.submit(new Admin.CurrentContainers(), new CompletionListener<Collection<String>>() {
+		admin.submit(new AdminServer.CurrentContainers(), new CompletionListener<Collection<String>>() {
 			@Override
 			public void onCompletion(Collection<String> result) {
 				containers.addAll(result);

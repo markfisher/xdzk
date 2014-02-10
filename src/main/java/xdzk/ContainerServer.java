@@ -11,25 +11,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Prototype for a Container node that writes its attributes to an
+ * Prototype for a container node that writes its attributes to an
  * ephemeral znode under {@code /xd/containers/}. The name of that
- * znode matches the UUID generated for this Container instance.
+ * znode matches the UUID generated for this ContainerServer instance.
  *
  * @author Mark Fisher
  */
-public class Container extends AbstractServer {
+public class ContainerServer extends AbstractServer {
 
 	/**
 	 * Logger.
 	 */
-	private static final Logger LOG = LoggerFactory.getLogger(Container.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ContainerServer.class);
 
 	/**
-	 * Construct a Container.
+	 * Construct a ContainerServer.
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
 	 */
-	public Container(String hostPort) {
+	public ContainerServer(String hostPort) {
 		super(hostPort);
 	}
 
@@ -50,7 +50,7 @@ public class Container extends AbstractServer {
 	}
 
 	/**
-	 * Start a Container node. A ZooKeeper host:port may be optionally
+	 * Start a container node. A ZooKeeper host:port may be optionally
 	 * passed in as an argument. The default ZooKeeper host/port is
 	 * {@code localhost:2181}.
 	 *
@@ -59,7 +59,7 @@ public class Container extends AbstractServer {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-		new Container(args.length == 1 ? args[0] : "localhost:2181").run();
+		new ContainerServer(args.length == 1 ? args[0] : "localhost:2181").run();
 	}
 
 }
