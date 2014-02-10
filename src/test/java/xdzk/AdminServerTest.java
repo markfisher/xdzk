@@ -6,7 +6,9 @@ import com.oracle.tools.runtime.java.NativeJavaApplicationBuilder;
 import com.oracle.tools.runtime.java.SimpleJavaApplication;
 import com.oracle.tools.runtime.java.SimpleJavaApplicationSchema;
 import com.oracle.tools.util.CompletionListener;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,39 +27,62 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * @author Patrick Peralta
  */
-public class AdminTest {
+public class AdminServerTest {
 	/**
 	 * Logger.
 	 */
-	private static final Logger LOG = LoggerFactory.getLogger(AdminTest.class);
+	private static final Logger LOG = LoggerFactory.getLogger(AdminServerTest.class);
 
 	/**
-	 * Start up an Admin server and obtain the list of running containers.
+	 * Instance of {@link AdminServer} used for testing.
+	 *
+	 * @see #startServer
+	 * @see #stopServer
+	 */
+	private static JavaApplication<SimpleJavaApplication> adminServer;
+
+	/**
+	 * Start an {@link AdminServer} used for testing.
 	 *
 	 * @throws Exception
 	 */
-	@Test
-	public void simpleAdminTest() throws Exception {
+	@BeforeClass
+	public static void startServer() throws Exception {
 		String classpath = System.getProperty("java.class.path");
 		SimpleJavaApplicationSchema schema = new SimpleJavaApplicationSchema(AdminServer.class.getName(), classpath);
 		NativeJavaApplicationBuilder<SimpleJavaApplication, SimpleJavaApplicationSchema> builder =
 				new NativeJavaApplicationBuilder<>();
-		JavaApplication<SimpleJavaApplication> admin = builder.realize(schema, "Admin Server",
-				new SystemApplicationConsole());
+		adminServer = builder.realize(schema, "Admin Server", new SystemApplicationConsole());
 
 		// Wait for the application to start; don't have a better way
 		// of doing this at the moment.
 		Thread.sleep(500);
 
-		Assert.assertNotNull(admin);
+		Assert.assertNotNull(adminServer);
+	}
 
+	/**
+	 * Stop the {@link AdminServer} after testing is complete.
+	 */
+	@AfterClass
+	public static void stopServer() {
+		adminServer.close();
+	}
+
+	/**
+	 * Obtain the list of running containers.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void containerListTest() throws Exception {
 		// Once the server has started up, send a remote invocation to obtain
 		// the list of container nodes the admin knows of.
 		final Set<String> containers = Collections.synchronizedSet(new HashSet<String>());
 		final CountDownLatch latch = new CountDownLatch(1);
 		final AtomicReference<Exception> exception = new AtomicReference<>();
 
-		admin.submit(new AdminServer.CurrentContainers(), new CompletionListener<Collection<String>>() {
+		adminServer.submit(new AdminServer.CurrentContainers(), new CompletionListener<Collection<String>>() {
 			@Override
 			public void onCompletion(Collection<String> result) {
 				containers.addAll(result);
@@ -77,6 +102,41 @@ public class AdminTest {
 			}
 			// todo: this is where we would assert a set of containers
 			LOG.info("Found the following running containers: {}", containers);
+		}
+		else {
+			Assert.fail("Time out while waiting for method completion");
+		}
+	}
+
+	/**
+	 * Test stream deployment.
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void testStreamDeploymentRequest() throws Exception {
+		final CountDownLatch latch = new CountDownLatch(1);
+		final AtomicReference<Exception> exception = new AtomicReference<>();
+
+		adminServer.submit(new AdminServer.StreamDeploymentRequest("ticktock", "time|log"), new CompletionListener<Void>() {
+			@Override
+			public void onCompletion(Void result) {
+				latch.countDown();
+			}
+
+			@Override
+			public void onException(Exception e) {
+				exception.set(e);
+				latch.countDown();
+			}
+		});
+
+		if (latch.await(10, TimeUnit.SECONDS)) {
+			if (exception.get() != null) {
+				throw exception.get();
+			}
+			// todo: assert that the deployment request was written to zk?
+			LOG.info("Deployment request sent");
 		}
 		else {
 			Assert.fail("Time out while waiting for method completion");
