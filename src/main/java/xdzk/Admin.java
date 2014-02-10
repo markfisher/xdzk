@@ -333,6 +333,7 @@ public class Admin extends AbstractServer {
 	/**
 	 * Callable implementation that returns the known container paths.
 	 */
+	@SuppressWarnings("serial")
 	public static class CurrentContainers implements Callable<Collection<String>>, Serializable {
 		@Override
 		public Collection<String> call() throws Exception {
