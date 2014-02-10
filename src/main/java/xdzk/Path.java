@@ -12,19 +12,40 @@ import org.apache.zookeeper.ZooKeeper;
  */
 public enum Path {
 
-	// base path where admin nodes compete for leadership
+	/**
+	 * Base path where admin nodes compete for leadership.
+	 */
 	ADMIN("/admin", CreateMode.EPHEMERAL),
 
-	// base path where container nodes register themselves
+	/**
+	 * Base path where container nodes register themselves.
+	 */
 	CONTAINERS("/containers", CreateMode.PERSISTENT),
 
-	// base path where an admin node sends deployment requests
-	DEPLOYMENTS("/deployments", CreateMode.PERSISTENT);
+	/**
+	 * Base path where an admin node sends deployment requests.
+	 */
+	DEPLOYMENTS("/deployments", CreateMode.PERSISTENT),
 
+	/**
+	 * Base path where an admin node writes stream deployment
+	 * requests.
+	 */
+	STREAMS("/streams", CreateMode.PERSISTENT);
+
+	/**
+	 * Root node for all XD nodes.
+	 */
 	private static final String ROOT = "/xd";
 
+	/**
+	 * Full path for ZooKeeper znode.
+	 */
 	private final String absolute;
 
+	/**
+	 * Create mode for znode path.
+	 */
 	private final CreateMode createMode;
 
 	/**

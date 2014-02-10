@@ -1,6 +1,7 @@
 package xdzk;
 
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -115,6 +116,50 @@ public class AdminServer extends AbstractServer {
 	 */
 	public Set<String> getContainerPaths() {
 		return containerPaths;
+	}
+
+	/**
+	 * Handle a stream deployment request. Upon completion of this
+	 * method, the request for deployment is persisted. However, the
+	 * actual deployment of the stream is executed in the background.
+	 * <p>
+	 * Implementation consists of writing the stream deployment
+	 * request under the {@link Path#STREAMS} znode.
+	 *
+	 * @param name        stream name
+	 * @param definition  stream definition (pipe delimited list of modules)
+	 */
+	public void handleStreamDeployment(String name, String definition) {
+		// TODO: improve parameter validation
+		if (name == null) {
+			throw new NullPointerException("name == null");
+		}
+		if (definition == null) {
+			throw new NullPointerException("definition == null");
+		}
+
+		try {
+			ZooKeeper client = getClient();
+			Path.STREAMS.verify(client);
+
+			client.create(Path.STREAMS.toString() + '/' + name, definition.getBytes("UTF-8"),
+					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+		}
+		catch (KeeperException.NodeExistsException e) {
+			// TODO: this could occur if the REST client issues the same request
+			// multiple times; should this be ignored or should there be a
+			// response indicating a duplicate request?
+		}
+		catch (KeeperException | UnsupportedEncodingException e) {
+			throw new RuntimeException(e);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			// TODO: if the thread is interrupted we have no idea if the
+			// request succeeded; what kind of response should be sent?
+			throw new RuntimeException(e);
+		}
+
 	}
 
 	/**
@@ -329,11 +374,46 @@ public class AdminServer extends AbstractServer {
 	/**
 	 * Callable implementation that returns the known container paths.
 	 */
-	@SuppressWarnings("serial")
 	public static class CurrentContainers implements Callable<Collection<String>>, Serializable {
+		private static final long serialVersionUID = 0L;
+
 		@Override
 		public Collection<String> call() throws Exception {
 			return INSTANCE.getContainerPaths();
+		}
+	}
+
+	/**
+	 * Callable implementation that requests a stream deployment.
+	 */
+	public static class StreamDeploymentRequest implements Callable<Void>, Serializable {
+		private static final long serialVersionUID = 0L;
+
+		/**
+		 * Stream name.
+		 */
+		private final String name;
+
+		/**
+		 * Stream definition.
+		 */
+		private final String definition;
+
+		/**
+		 * Construct a StreamDeploymentRequest.
+		 *
+		 * @param name        stream name
+		 * @param definition  stream definition (pipe delimited list of modules)
+		 */
+		public StreamDeploymentRequest(String name, String definition) {
+			this.name = name;
+			this.definition = definition;
+		}
+
+		@Override
+		public Void call() throws Exception {
+			INSTANCE.handleStreamDeployment(name, definition);
+			return null;
 		}
 	}
 
