@@ -324,7 +324,11 @@ public class AdminServer extends AbstractServer {
 		String container = this.containerMatcher.match(module, getContainerPaths());
 		LOG.info("deploying module '{}' to container: {}", module, container);
 		try {
-			getClient().create(Path.DEPLOYMENTS + "/" + container + "/" + module, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+			getClient().create(Path.DEPLOYMENTS + "/" + container + "/" + module, null,
+					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+		}
+		catch (KeeperException.NodeExistsException e) {
+			// TODO: what could cause a repeat deployment?
 		}
 		catch (KeeperException e) {
 			throw new RuntimeException("failed to deploy module '" + module + "' to container: " + container, e);
@@ -366,7 +370,7 @@ public class AdminServer extends AbstractServer {
 				requestLeadership();
 			}
 		}
-	};
+	}
 
 	/**
 	 * Callback implementation that is invoked upon writing to the {@code /xd/admin} znode.
