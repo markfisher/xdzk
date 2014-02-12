@@ -6,6 +6,7 @@ import com.oracle.tools.runtime.java.NativeJavaApplicationBuilder;
 import com.oracle.tools.runtime.java.SimpleJavaApplication;
 import com.oracle.tools.runtime.java.SimpleJavaApplicationSchema;
 
+import javax.net.SocketFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -86,9 +87,9 @@ public class ZooKeeperStandalone {
 
 		do {
 			try {
-				Thread.sleep(10);
-				socket = new Socket();
-				socket.connect(new InetSocketAddress("localhost", PORT));
+				Thread.sleep(100);
+				socket = SocketFactory.getDefault().createSocket();
+				socket.connect(new InetSocketAddress("localhost", PORT), 5000);
 				canConnect = true;
 				socket.close();
 				socket = null;
@@ -107,7 +108,7 @@ public class ZooKeeperStandalone {
 				}
 			}
 		}
-		while ((!canConnect) && tries < 10);
+		while ((!canConnect) && tries < 100);
 
 		if (!canConnect) {
 			throw new IllegalStateException("Cannot connect to ZooKeeper server");
