@@ -1,6 +1,7 @@
 package zk.election;
 
-import java.io.IOException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.CreateMode;
@@ -9,7 +10,6 @@ import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
-import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
@@ -54,14 +54,9 @@ public class Nomination {
 	private final String path;
 
 	/**
-	 * ZooKeeper client connect string. Default is {@code localhost:2181}.
+	 * Optional data to be written to the leader node.
 	 */
-	private final String connectString;
-
-	/**
-	 * Timeout for the ZooKeeper session. Default is 15 seconds.
-	 */
-	private final int sessionTimeout;
+	private byte[] data;
 
 	/**
 	 * ZooKeeper client used for all interaction with nodes.
@@ -90,50 +85,34 @@ public class Nomination {
 	private final LeaderExistsCallback leaderExistsCallback = new LeaderExistsCallback();
 
 	/**
-	 * Watcher instance for the ZooKeeper client to notify of connections, disconnections, etc.
-	 */
-	private final ZooKeeperWatcher zkWatcher = new ZooKeeperWatcher();
-
-	/**
-	 * Create a Nomination using the default connect string of
-	 * {@code localhost:2181} and the default session timeout of 15 seconds.
-	 *
-	 * @param candidate the Candidate for leadership
-	 * @param path the path of the leader node in ZooKeeper
-	 */
-	public Nomination(Candidate candidate, String path) {
-		this(candidate, path, "localhost:2181", 15000);
-	}
-
-	/**
 	 * Create a Nomination.
 	 *
+	 * @param client the ZooKeeper client
 	 * @param candidate the Candidate for leadership
 	 * @param path the path of the leader node in ZooKeeper
-	 * @param connectString the ZooKeeper client connect string
-	 * @param sessionTimeout the ZooKeeper session timeout in milliseconds
 	 */
-	public Nomination(Candidate candidate, String path, String connectString, int sessionTimeout) {
+	public Nomination(ZooKeeper client, Candidate candidate, String path) {
+		this.client = client;
 		this.candidate = candidate;
 		this.path = path;
-		this.connectString = connectString;
-		this.sessionTimeout = sessionTimeout;
 	}
 
 	/**
-	 * Submit this nomination. Establishes a ZooKeeper client connection.
-	 * The callback for successful connection will then proceed with a
-	 * request to take leadership. A watch will be set on the leader node
-	 * so that this nomination's candidate may become a leader in the future
-	 * even if it is not elected in the initial attempt.
+	 * Provide data to be written to the leader node.
+	 *
+	 * @param data byte array to be written
+	 */
+	public void setData(byte[] data) {
+		this.data = data;
+	}
+
+	/**
+	 * Submit this nomination for leadership. A watch will be set on the leader node so that this nomination's
+	 * candidate may become a leader in the future even if it is not elected in the initial attempt.
 	 */
 	public void submit() {
-		try {
-			this.client = new ZooKeeper(connectString, sessionTimeout, zkWatcher);
-		}
-		catch (IOException e) {
-			throw new RuntimeException("failed to connect to ZooKeeper", e);
-		}
+		ensureParentPathExists();
+		requestLeadership();
 	}
 
 	/**
@@ -144,7 +123,6 @@ public class Nomination {
 	private void handleResignation() {
 		try {
 			client.delete(path, -1);
-			client.close();
 		}
 		catch (KeeperException e) {
 			throw new RuntimeException("failed during cleanup", e);
@@ -160,7 +138,7 @@ public class Nomination {
 	 * @see zk.election.Nomination.LeadershipRequestCallback
 	 */
 	private void requestLeadership() {
-		client.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, leadershipRequestCallback, null);
+		client.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, leadershipRequestCallback, null);
 	}
 
 	/**
@@ -263,9 +241,16 @@ public class Nomination {
 				return;
 			case OK:
 				status = Status.ELECTED;
-				candidate.elect();
-				// the elect method should block until resignation
-				handleResignation();
+				// TODO: make the Executor pluggable
+				Executor executor = Executors.newSingleThreadExecutor();
+				executor.execute(new Runnable() {
+					@Override
+					public void run() {
+						candidate.elect();
+						// the elect method should block until resignation
+						handleResignation();
+					}
+				});
 				break;
 			case NODEEXISTS:
 				status = Status.REJECTED;
@@ -300,29 +285,6 @@ public class Nomination {
 			default:
 				checkLeadership();
 				break;
-			}
-		}
-	}
-
-	/**
-	 * Watcher implementation for the ZooKeeper client to notify of connections, disconnections, etc.
-	 */
-	private class ZooKeeperWatcher implements Watcher {
-
-		@Override
-		public void process(WatchedEvent event) {
-			if (KeeperState.SyncConnected.equals(event.getState())) {
-				ensureParentPathExists();
-				requestLeadership();
-			}
-			else if (KeeperState.Disconnected.equals(event.getState())) {
-				LOG.info("DISCONNECTED");
-				try {
-					client.close();
-				}
-				catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-				}
 			}
 		}
 	}

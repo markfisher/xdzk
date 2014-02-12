@@ -1,7 +1,11 @@
 package zk.election;
 
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,9 +59,16 @@ public class ElectionDemo {
 		}
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
+		Watcher zkWatcher = new Watcher() {
+			@Override
+			public void process(WatchedEvent event) {
+				LOG.info("ZK event received: " + event);
+			}
+		};
+		ZooKeeper client = new ZooKeeper("localhost:2181", 15000, zkWatcher);
 		ShortTermCandidate candidate = new ShortTermCandidate(10);
-		Nomination nomination = new Nomination(candidate, "/demo/leader");
+		Nomination nomination = new Nomination(client, candidate, "/demo/leader");
 		nomination.submit();
 		try {
 			candidate.awaitResignation();
