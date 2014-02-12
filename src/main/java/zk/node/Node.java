@@ -1,6 +1,13 @@
 package zk.node;
 
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.CountDownLatch;
+
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -10,13 +17,6 @@ import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.CountDownLatch;
 
 /**
  * Representation of a ZooKeeper node with the following features:
@@ -213,41 +213,41 @@ public class Node {
 		@Override
 		public void processResult(int rc, String path, Object ctx, List<String> children) {
 			LOG.debug(">>> path: {}, children: {}", path, children);
-			Set <String> arrived = new HashSet<>();
-			Set <String> departed = new HashSet<>();
+			Set <String> added = new HashSet<>();
+			Set <String> removed = new HashSet<>();
 			if (children == null) {
 				children = Collections.emptyList();
 			}
 
 			for (String child : children) {
 				if (!cache.contains(child)) {
-					arrived.add(child);
+					added.add(child);
 				}
 			}
 
 			Set<String> newChildren = Collections.unmodifiableSet(new HashSet<>(children));
 			for (String child : cache) {
 				if (!newChildren.contains(child)) {
-					departed.add(child);
+					removed.add(child);
 				}
 			}
 
 			cache = newChildren;
 
-			LOG.debug("New:      {}", arrived);
-			LOG.debug("Departed: {}", departed);
+			LOG.debug("Added:    {}", added);
+			LOG.debug("Removed:  {}", removed);
 			LOG.debug("All:      {}", cache);
 
-			if (arrived.isEmpty() && departed.isEmpty()) {
+			if (added.isEmpty() && removed.isEmpty()) {
 				return;
 			}
 
 			for (NodeListener listener : listeners) {
-				if (!arrived.isEmpty()) {
-					listener.onChildrenAdded(Collections.unmodifiableSet(arrived));
+				if (!added.isEmpty()) {
+					listener.onChildrenAdded(Collections.unmodifiableSet(added));
 				}
-				if (!departed.isEmpty()) {
-					listener.onChildrenRemoved(Collections.unmodifiableSet(departed));
+				if (!removed.isEmpty()) {
+					listener.onChildrenRemoved(Collections.unmodifiableSet(removed));
 				}
 			}
 
