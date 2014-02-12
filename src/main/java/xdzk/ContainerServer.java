@@ -1,22 +1,19 @@
 package xdzk;
 
-import java.lang.management.ManagementFactory;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import zk.node.Node;
+import zk.node.NodeListener;
+
+import java.lang.management.ManagementFactory;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Prototype for a container node that writes its attributes to an
@@ -34,22 +31,18 @@ public class ContainerServer extends AbstractServer {
 	private static final Logger LOG = LoggerFactory.getLogger(ContainerServer.class);
 
 	/**
-	 * Watcher instance that watches the {@code /xd/deployments} znode path.
+	 * {@link zk.node.NodeListener} implementation that handles deployment requests
+	 * (and deployment removals) for this container.
 	 */
-	private final DeploymentPathWatcher deploymentPathWatcher = new DeploymentPathWatcher();
+	private final NodeListener deploymentListener = new DeploymentListener();
 
 	/**
-	 * Callback instance that is invoked to process the result of
-	 * {@link ZooKeeper#getChildren} on the {@code /xd/deployments} znode.
-	 */
-	private final DeploymentPathCallback deploymentPathCallback = new DeploymentPathCallback();
-
-	/**
-	 * Set of deployments under {@code /xd/container/[this-server-id]}.
+	 * Node used to track deployments for this container.
 	 */
 	// Marked as volatile because this reference is updated by the
 	// ZK event dispatch thread and is read by public method getDeployments
-	private volatile Set<String> deployments = Collections.emptySet();
+	private volatile Node deployments;
+
 
 	/**
 	 * Construct a ContainerServer.
@@ -69,7 +62,7 @@ public class ContainerServer extends AbstractServer {
 
 	/**
 	 * {@inheritDoc}
-	 * <p>
+	 * <p/>
 	 * Upon connection the container will ensure the creation of required
 	 * znode paths and will set up appropriate watches.
 	 */
@@ -88,13 +81,11 @@ public class ContainerServer extends AbstractServer {
 			zk.create(Path.CONTAINERS + "/" + this.getId(), attributes.toString().getBytes(),
 					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
 
-			Path.DEPLOYMENTS.verify(zk);
-			zk.create(Path.DEPLOYMENTS + "/" + this.getId(), null,
-					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+			deployments = new Node(zk, Path.DEPLOYMENTS + "/" + this.getId());
+			deployments.addListener(deploymentListener);
+			deployments.init();
 
 			LOG.info("Started container {} with attributes: {} ", this.getId(), attributes);
-
-			watchDeployments();
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -111,66 +102,27 @@ public class ContainerServer extends AbstractServer {
 	}
 
 	/**
-	 * Asynchronously obtain a list of children under {@code /xd/deployments}.
-	 *
-	 * @see xdzk.ContainerServer.DeploymentPathCallback
-	 */
-	protected void watchDeployments() {
-		getClient().getChildren(Path.DEPLOYMENTS.toString() + '/' + getId(),
-				deploymentPathWatcher, deploymentPathCallback, null);
-	}
-
-	/**
 	 * Return a set of deployments for this container server.
 	 *
 	 * @return read-only set of deployments
 	 */
 	public Set<String> getDeployments() {
-		return deployments;
+		return deployments.getChildren();
 	}
 
 	/**
-	 * Watcher implementation that watches the {@code /xd/deployments} znode path.
+	 * {@link zk.node.NodeListener} implementation that handles
+	 * deployment additions and removals.
 	 */
-	class DeploymentPathWatcher implements Watcher {
+	class DeploymentListener implements NodeListener {
 		@Override
-		public void process(WatchedEvent event) {
-			watchDeployments();
+		public void onChildrenAdded(Set<String> children) {
+			LOG.info("Deployments added: {}", children);
 		}
-	}
 
-	/**
-	 * Callback implementation that is invoked to process the result of
-	 * {@link ZooKeeper#getChildren} on the {@code /xd/deployments} znode.
-	 */
-	class DeploymentPathCallback implements AsyncCallback.ChildrenCallback {
 		@Override
-		public void processResult(int rc, String path, Object ctx, List<String> children) {
-			LOG.debug(">>> path: {}, children: {}", path, children);
-			Set <String> arrived = new HashSet<>();
-			Set <String> departed = new HashSet<>();
-			if (children == null) {
-				children = Collections.emptyList();
-			}
-
-			for (String child : children) {
-				if (!deployments.contains(child)) {
-					arrived.add(child);
-				}
-			}
-
-			Set<String> newPaths = Collections.unmodifiableSet(new HashSet<>(children));
-			for (String child : deployments) {
-				if (!newPaths.contains(child)) {
-					departed.add(child);
-				}
-			}
-
-			deployments = newPaths;
-
-			LOG.info("New deployments:      {}", arrived);
-			LOG.info("Departed deployments: {}", departed);
-			LOG.info("All deployments:      {}", deployments);
+		public void onChildrenRemoved(Set<String> children) {
+			LOG.info("Deployments removed: {}", children);
 		}
 	}
 
@@ -186,5 +138,4 @@ public class ContainerServer extends AbstractServer {
 	public static void main(String[] args) throws Exception {
 		new ContainerServer(args.length == 1 ? args[0] : "localhost:2181").run();
 	}
-
 }
