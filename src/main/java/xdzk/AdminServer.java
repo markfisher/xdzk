@@ -23,6 +23,8 @@ import org.slf4j.LoggerFactory;
 
 import zk.election.Candidate;
 import zk.election.Nomination;
+import zk.node.Node;
+import zk.node.NodeListener;
 
 /**
  * Prototype implementation of an XD admin server that watches ZooKeeper
@@ -42,18 +44,22 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 */
 	private static final Logger LOG = LoggerFactory.getLogger(AbstractServer.class);
 
+	/**
+	 * Indicates whether this admin is currently the leader.
+	 */
 	private volatile boolean leader;
 
 	/**
-	 * Watcher instance that watches the {@code /xd/container} znode path.
+	 * Node used to track containers in the same cluster as this admin.
 	 */
-	private final ContainerPathWatcher containerPathWatcher = new ContainerPathWatcher();
+	// Marked as volatile because this reference is updated by the
+	// ZK event dispatch thread and is read by public method getContainers
+	private volatile Node containers;
 
 	/**
-	 * Callback instance that is invoked to process the result of
-	 * {@link ZooKeeper#getChildren} on the {@code /xd/container} znode.
+	 * {@link zk.node.NodeListener} implementation that handles container additions and removals.
 	 */
-	private final ContainerPathCallback containerPathCallback = new ContainerPathCallback();
+	private final NodeListener containerListener = new ContainerListener();
 
 	/**
 	 * Watcher instance that watches the {@code /xd/streams} znode path.
@@ -74,13 +80,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 
 	// TODO: make this pluggable
 	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
-
-	/**
-	 * Set of current container paths under {@code /xd/container}.
-	 */
-	// Marked as volatile because this reference is updated by the
-	// ZK event dispatch thread and is read by public method getContainerPaths
-	private volatile Set<String> containerPaths = Collections.emptySet();
 
 	/**
 	 * Set of current stream paths under {@code /xd/streams}.
@@ -113,7 +112,7 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 * @return read-only set of container paths
 	 */
 	public Set<String> getContainerPaths() {
-		return containerPaths;
+		return containers.getChildren();
 	}
 
 	/**
@@ -180,6 +179,9 @@ public class AdminServer extends AbstractServer implements Candidate {
 			Path.CONTAINERS.verify(client);
 			Path.STREAMS.verify(client);
 			Path.DEPLOYMENTS.verify(client);
+			containers = new Node(client, Path.CONTAINERS.toString());
+			containers.addListener(containerListener);
+			containers.init();
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -187,10 +189,9 @@ public class AdminServer extends AbstractServer implements Candidate {
 			// not sure what to do here, but returning before anything else
 			return;
 		}
-		Nomination nomination = new Nomination(this.getClient(), this, Path.ADMIN.toString());
+		Nomination nomination = new Nomination(client, this, Path.ADMIN.toString());
 		nomination.setData(this.getId().getBytes());
 		nomination.submit();
-		watchContainers();
 	}
 
 	/**
@@ -200,15 +201,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 	protected void onDisconnect(WatchedEvent event) {
 		// TODO: stop watching for stream deployment requests if leader
 		// or is what we do in StreamPathWatcher sufficient?
-	}
-
-	/**
-	 * Asynchronously obtain a list of children under {@code /xd/containers}.
-	 *
-	 * @see xdzk.AdminServer.ContainerPathCallback
-	 */
-	protected void watchContainers() {
-		getClient().getChildren(Path.CONTAINERS.toString(), containerPathWatcher, containerPathCallback, null);
 	}
 
 	/**
@@ -289,57 +281,18 @@ public class AdminServer extends AbstractServer implements Candidate {
 	}
 
 	/**
-	 * Watcher implementation that watches the {@code /xd/container} znode path.
+	 * {@link zk.node.NodeListener} implementation that handles container additions and removals.
 	 */
-	class ContainerPathWatcher implements Watcher {
+	class ContainerListener implements NodeListener {
+
 		@Override
-		public void process(WatchedEvent event) {
-			LOG.info(">> ContainerPathWatcher event: {}", event);
-			watchContainers();
+		public void onChildrenAdded(Set<String> children) {
+			LOG.info("Containers added: {}", children);
 		}
-	}
 
-	/**
-	 * Callback implementation that is invoked to process the result of
-	 * {@link ZooKeeper#getChildren} on the {@code /xd/container} znode.
-	 */
-	class ContainerPathCallback implements AsyncCallback.ChildrenCallback {
-		/**
-		 * {@inheritDoc}
-		 * <p>
-		 * This callback updates the {@link #containerPaths} set with the latest
-		 * known container paths.
-		 */
 		@Override
-		public void processResult(int rc, String path, Object ctx, List<String> children) {
-			LOG.info(">> ContainerPathCallback result: {}, {}, {}, {}", rc, path, ctx, children);
-
-			Set<String> arrived = new HashSet<>();
-			Set<String> departed = new HashSet<>();
-			if (children == null) {
-				children = Collections.emptyList();
-			}
-
-			for (String child : children) {
-				if (!containerPaths.contains(child)) {
-					arrived.add(child);
-				}
-			}
-
-			Set<String> newPaths = Collections.unmodifiableSet(new HashSet<>(children));
-			for (String child : containerPaths) {
-				if (!newPaths.contains(child)) {
-					departed.add(child);
-				}
-			}
-
-			containerPaths = newPaths;
-
-			// todo: consider a pluggable listener for new and departed containers
-
-			LOG.info("New containers:      {}", arrived);
-			LOG.info("Departed containers: {}", departed);
-			LOG.info("All containers:      {}", containerPaths);
+		public void onChildrenRemoved(Set<String> children) {
+			LOG.info("Containers removed: {}", children);
 		}
 	}
 
