@@ -1,5 +1,10 @@
 package xdzk;
 
+import java.lang.management.ManagementFactory;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
@@ -7,13 +12,9 @@ import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import zk.node.Node;
 import zk.node.NodeListener;
-
-import java.lang.management.ManagementFactory;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Prototype for a container node that writes its attributes to an
@@ -51,13 +52,6 @@ public class ContainerServer extends AbstractServer {
 	 */
 	public ContainerServer(String hostPort) {
 		super(hostPort);
-	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void doStart() throws Exception {
 	}
 
 	/**

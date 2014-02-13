@@ -76,20 +76,11 @@ public abstract class AbstractServer implements Runnable {
 	public void start() throws InterruptedException {
 		try {
 			this.zk = new ZooKeeper(hostPort, 15000, zkWatcher);
-			this.doStart();
 		}
 		catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}
-
-	/**
-	 * Method that concrete Server subclasses must implement for any actions
-	 * they need to take on startup.
-	 *
-	 * @throws Exception
-	 */
-	protected abstract void doStart() throws Exception;
 
 	/**
 	 * Method that concrete Server subclasses can override for processing watch connect events.

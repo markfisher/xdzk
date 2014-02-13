@@ -378,10 +378,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 		}
 	}
 
-	@Override
-	protected void doStart() throws Exception {
-	}
-
 	/**
 	 * Start an Admin server. A ZooKeeper host:port may be optionally
 	 * passed in as an argument. The default ZooKeeper host/port is
