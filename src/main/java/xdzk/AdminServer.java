@@ -41,6 +41,13 @@ public class AdminServer extends AbstractServer implements Candidate {
 	private static final Logger LOG = LoggerFactory.getLogger(AbstractServer.class);
 
 	/**
+	 * Singleton instance of the Admin server.
+	 */
+	// Marked as volatile because this reference is updated by the
+	// main thread and is read by the CurrentContainers callable.
+	public static volatile AdminServer INSTANCE;
+
+	/**
 	 * Node used to track containers in the same cluster as this admin.
 	 */
 	// Marked as volatile because this reference is updated by the
@@ -73,15 +80,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 	// TODO: make this pluggable
 	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
 
-
-	/**
-	 * Singleton instance of the Admin server.
-	 */
-	// Marked as volatile because this reference is updated by the
-	// main thread and is read by the CurrentContainers callable.
-	public static volatile AdminServer INSTANCE;
-
-
 	/**
 	 * Admin constructor.
 	 *
@@ -107,49 +105,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 */
 	public Set<String> getStreamPaths() {
 		return streams.getChildren();
-	}
-
-	/**
-	 * Handle a stream deployment request. Upon completion of this
-	 * method, the request for deployment is persisted. However, the
-	 * actual deployment of the stream is executed in the background.
-	 * <p>
-	 * Implementation consists of writing the stream deployment
-	 * request under the {@link Path#STREAMS} znode.
-	 *
-	 * @param name        stream name
-	 * @param definition  stream definition (pipe delimited list of modules)
-	 */
-	public void handleStreamDeployment(String name, String definition) {
-		// TODO: improve parameter validation
-		if (name == null) {
-			throw new IllegalArgumentException("name must not be null");
-		}
-		if (definition == null) {
-			throw new IllegalArgumentException("definition must not be null");
-		}
-
-		try {
-			getClient().create(Path.STREAMS.toString() + '/' + name, definition.getBytes("UTF-8"),
-					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-		}
-		catch (KeeperException.NodeExistsException e) {
-			// TODO: this could occur if the REST client issues the same request
-			// multiple times; should this be ignored or should there be a
-			// response indicating a duplicate request?
-		}
-		catch (KeeperException e) {
-			throw new RuntimeException(e);
-		}
-		catch (UnsupportedEncodingException e) {
-			throw new RuntimeException(e);
-		}
-		catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			// TODO: if the thread is interrupted we have no idea if the
-			// request succeeded; what kind of response should be sent?
-			throw new RuntimeException(e);
-		}
 	}
 
 	/**
@@ -218,6 +173,49 @@ public class AdminServer extends AbstractServer implements Candidate {
 				}
 			}
 		}*/
+	}
+
+	/**
+	 * Handle a stream deployment request. Upon completion of this
+	 * method, the request for deployment is persisted. However, the
+	 * actual deployment of the stream is executed in the background.
+	 * <p>
+	 * Implementation consists of writing the stream deployment
+	 * request under the {@link Path#STREAMS} znode.
+	 *
+	 * @param name        stream name
+	 * @param definition  stream definition (pipe delimited list of modules)
+	 */
+	public void handleStreamDeployment(String name, String definition) {
+		// TODO: improve parameter validation
+		if (name == null) {
+			throw new IllegalArgumentException("name must not be null");
+		}
+		if (definition == null) {
+			throw new IllegalArgumentException("definition must not be null");
+		}
+
+		try {
+			getClient().create(Path.STREAMS.toString() + '/' + name, definition.getBytes("UTF-8"),
+					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+		}
+		catch (KeeperException.NodeExistsException e) {
+			// TODO: this could occur if the REST client issues the same request
+			// multiple times; should this be ignored or should there be a
+			// response indicating a duplicate request?
+		}
+		catch (KeeperException e) {
+			throw new RuntimeException(e);
+		}
+		catch (UnsupportedEncodingException e) {
+			throw new RuntimeException(e);
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			// TODO: if the thread is interrupted we have no idea if the
+			// request succeeded; what kind of response should be sent?
+			throw new RuntimeException(e);
+		}
 	}
 
 	/**
