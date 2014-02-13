@@ -1,6 +1,18 @@
 package zk.node;
 
-import com.oracle.tools.deferred.Eventually;
+import static com.oracle.tools.deferred.DeferredHelper.eventually;
+import static com.oracle.tools.deferred.DeferredHelper.invoking;
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.junit.Assert.assertThat;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -11,20 +23,10 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import xdzk.ZooKeeperStandalone;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import static com.oracle.tools.deferred.DeferredHelper.eventually;
-import static com.oracle.tools.deferred.DeferredHelper.invoking;
-import static org.hamcrest.CoreMatchers.hasItems;
-import static org.junit.Assert.assertThat;
+import com.oracle.tools.deferred.Eventually;
 
 /**
  * @author Patrick Peralta
@@ -91,6 +93,10 @@ public class NodeTest {
 			final Set<String> removed = Collections.synchronizedSet(new HashSet<String>());
 			Node node = new Node(client, path).init();
 			node.addListener(new NodeListener() {
+				@Override
+				public void onDataUpdated(byte[] oldData, byte[] newData) {
+				}
+
 				@Override
 				public void onChildrenAdded(Set<String> children) {
 					added.addAll(children);

@@ -271,6 +271,11 @@ public class AdminServer extends AbstractServer implements Candidate {
 	class ContainerListener implements NodeListener {
 
 		@Override
+		public void onDataUpdated(byte[] oldData, byte[] newData) {
+			LOG.info("Container data update: old={}, new={}", oldData, newData);
+		}
+
+		@Override
 		public void onChildrenAdded(Set<String> children) {
 			LOG.info("Containers added: {}", children);
 		}
@@ -290,6 +295,11 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 * {@code /xd/deployments} znode.
 	 */
 	class StreamListener implements NodeListener {
+
+		@Override
+		public void onDataUpdated(byte[] oldData, byte[] newData) {
+			LOG.info("Stream data update: old={}, new={}", oldData, newData);
+		}
 
 		@Override
 		public void onChildrenAdded(Set<String> children) {

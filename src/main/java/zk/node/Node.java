@@ -15,6 +15,7 @@ import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,15 @@ public class Node {
 	 * @see #watchChildren
 	 */
 	private final ChildCallback childCallback = new ChildCallback();
+
+	private final DataWatcher dataWatcher = new DataWatcher();
+
+	private final DataCallback dataCallback = new DataCallback();
+
+	/**
+	 * Data for this node.
+	 */
+	private volatile byte[] data;
 
 	/**
 	 * Cache of children for this node.
@@ -127,6 +137,7 @@ public class Node {
 			throw new RuntimeException(e);
 		}
 
+		watchData();
 		watchChildren();
 
 		return this;
@@ -254,6 +265,51 @@ public class Node {
 			if (ctx instanceof CountDownLatch) {
 				((CountDownLatch) ctx).countDown();
 			}
+		}
+	}
+
+	/**
+	 * Asynchronously update this instance's data field.
+	 * This also registers a watch that will be triggered when
+	 * data is updated for this node.
+	 */
+	protected void watchData() {
+		client.getData(path, dataWatcher, dataCallback, null);
+	}
+
+	/**
+	 * Watcher implementation for the data of this node.
+	 */
+	class DataWatcher implements Watcher {
+
+		@Override
+		public void process(WatchedEvent event) {
+			watchData();
+		}
+	}
+
+	/**
+	 * Callback implementation that is invoked to process the result
+	 * of {@link org.apache.zookeeper.ZooKeeper#getData} for this node.
+	 */
+	class DataCallback implements AsyncCallback.DataCallback {
+
+		/**
+		 * {@inheritDoc}
+		 * <p>
+		 * This callback implementation does the following:
+		 * <ul>
+		 *     <li>Updates the {@link #data} field</li>
+		 *     <li>Fires events to the registered {@link zk.node.NodeListener NodeListeners}</li>
+		 * </ul>
+		 */
+		@Override
+		public void processResult(int rc, String path, Object ctx, byte[] newData, Stat stat) {
+			LOG.debug(">>> path: {}, data: {}", path, data);
+			for (NodeListener listener : listeners) {
+				listener.onDataUpdated(data, newData);
+			}
+			data = newData;
 		}
 	}
 

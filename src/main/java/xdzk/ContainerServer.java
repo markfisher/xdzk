@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import zk.node.Node;
 import zk.node.NodeListener;
+import zk.node.NodeListenerAdapter;
 
 /**
  * Prototype for a container node that writes its attributes to an
@@ -108,7 +109,7 @@ public class ContainerServer extends AbstractServer {
 	 * {@link zk.node.NodeListener} implementation that handles
 	 * deployment additions and removals.
 	 */
-	class DeploymentListener implements NodeListener {
+	class DeploymentListener extends NodeListenerAdapter {
 		@Override
 		public void onChildrenAdded(Set<String> children) {
 			LOG.info("Deployments added: {}", children);
