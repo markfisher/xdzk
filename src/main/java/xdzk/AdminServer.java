@@ -6,14 +6,11 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
-import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,12 +67,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 * {@link zk.node.NodeListener} implementation that handles stream additions and removals.
 	 */
 	private final NodeListener streamListener = new StreamListener();
-
-	/**
-	 * Callback instance that is invoked to process the result of
-	 * {@link ZooKeeper#getData} on a child of {@code /xd/streams}.
-	 */
-	private final StreamDeploymentCallback streamDeploymentCallback = new StreamDeploymentCallback();
 
 	// TODO: make this pluggable
 	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
@@ -160,17 +151,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 			Thread.currentThread().interrupt();
 		}
 		streams.removeListener(streamListener);
-		// TODO: how do we deactivate a Node?
-		// Perhaps the Node's ChildWatcher needs a boolean flag which could
-		// be toggled via start/stop methods on the Node class, e.g.
-		/*class ChildWatcher implements Watcher {
-			@Override
-			public void process(WatchedEvent event) {
-				if (active) {
-					watchChildren();
-				}
-			}
-		}*/
 	}
 
 	/**
@@ -192,7 +172,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 		if (definition == null) {
 			throw new IllegalArgumentException("definition must not be null");
 		}
-
 		try {
 			getClient().create(Path.STREAMS.toString() + '/' + name, definition.getBytes("UTF-8"),
 					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -224,7 +203,9 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 * @see xdzk.AdminServer.StreamDeploymentCallback
 	 */
 	private void deployStream(String streamName) {
-		getClient().getData(Path.STREAMS.toString() + "/" + streamName, false, streamDeploymentCallback, null);
+		Node streamNode = new Node(getClient(), Path.STREAMS.toString() + "/" + streamName);
+		byte[] data = streamNode.getData();
+		deployModules(new String(data).split("\\|"));
 	}
 
 	/**
@@ -310,31 +291,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 		@Override
 		public void onChildrenRemoved(Set<String> children) {
 			LOG.info("Streams removed: {}", children);
-		}
-	}
-
-	/**
-	 * Callback implementation that is invoked upon reading the {@code /xd/streams} child
-	 * znode for a given stream deployment request.
-	 */
-	class StreamDeploymentCallback implements AsyncCallback.DataCallback {
-		@Override
-		public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
-			switch (Code.get(rc)) {
-			case CONNECTIONLOSS:
-				// TODO: replace with Assert.isInstanceOf once we depend on Spring
-				if (!(ctx instanceof String)) {
-					throw new IllegalArgumentException("Expected stream name in context object, but received: " + ctx);
-				}
-				deployStream((String) ctx);
-				return;
-			case NONODE:
-				// TODO: stream deployment request was deleted, ignore?
-				return;
-			default:
-				deployModules(new String(data).split("\\|"));
-				break;
-			}
 		}
 	}
 
