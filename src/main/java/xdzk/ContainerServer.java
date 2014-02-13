@@ -78,7 +78,6 @@ public class ContainerServer extends AbstractServer {
 
 			deployments = new Node(zk, Path.DEPLOYMENTS + "/" + this.getId());
 			deployments.addListener(deploymentListener);
-			deployments.init();
 
 			LOG.info("Started container {} with attributes: {} ", this.getId(), attributes);
 		}

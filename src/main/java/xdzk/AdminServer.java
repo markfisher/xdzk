@@ -121,7 +121,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 			Path.DEPLOYMENTS.verify(client);
 			containers = new Node(client, Path.CONTAINERS.toString());
 			containers.addListener(containerListener);
-			containers.init();
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -154,7 +153,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 		try {
 			streams = new Node(getClient(), Path.STREAMS.toString());
 			streams.addListener(streamListener);
-			streams.init();
 			// for now, we're just hanging out here to maintain leadership
 			Thread.sleep(Long.MAX_VALUE);
 		}

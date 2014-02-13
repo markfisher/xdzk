@@ -91,7 +91,7 @@ public class NodeTest {
 		try {
 			final Set<String> added = Collections.synchronizedSet(new HashSet<String>());
 			final Set<String> removed = Collections.synchronizedSet(new HashSet<String>());
-			Node node = new Node(client, path).init();
+			Node node = new Node(client, path);
 			node.addListener(new NodeListener() {
 				@Override
 				public void onDataUpdated(byte[] oldData, byte[] newData) {

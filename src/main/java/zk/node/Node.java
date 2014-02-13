@@ -61,8 +61,17 @@ public class Node {
 	 */
 	private final ChildCallback childCallback = new ChildCallback();
 
+	/**
+	 * Watcher instance that is notified when data is updated for this node.
+	 */
 	private final DataWatcher dataWatcher = new DataWatcher();
 
+	/**
+	 * Callback instance that is invoked to process the result
+	 * of {@link org.apache.zookeeper.ZooKeeper#getData}.
+	 *
+	 * @see #watchData
+	 */
 	private final DataCallback dataCallback = new DataCallback();
 
 	/**
@@ -74,6 +83,11 @@ public class Node {
 	 * Cache of children for this node.
 	 */
 	private volatile Set<String> cache = Collections.emptySet();
+
+	/**
+	 * Indicates whether this node is actively watching the corresponding znode.
+	 */
+	private volatile boolean attached;
 
 	/**
 	 * Set of {@link zk.node.NodeListener NodeListeners} to be notified
@@ -111,7 +125,7 @@ public class Node {
 	 *
 	 * @throws InterruptedException
 	 */
-	public Node init() throws InterruptedException {
+	private Node init() throws InterruptedException {
 		try {
 			if (client.exists(path, false) == null) {
 				String traversed = "/";
@@ -136,20 +150,88 @@ public class Node {
 		catch (KeeperException e) {
 			throw new RuntimeException(e);
 		}
-
-		watchData();
-		watchChildren();
-
 		return this;
 	}
 
 	/**
-	 * Return the cached set of children for this node.
+	 * Attach this node to the ZooKeeper znode by registering watchers.
+	 * This method will be invoked implicitly any time a listener is added to the node,
+	 * but if using this Node merely through {@link #getData()} or {@link #getChildren()}
+	 * calling this explicitly will ensure caching rather than synchronous retrieval when
+	 * invoking those methods.
+	 *
+	 * @return this object
+	 *
+	 * @throws InterruptedException
+	 */
+	public synchronized Node attach() throws InterruptedException {
+		if (!this.attached) {
+			this.attached = true;
+			this.init();
+			watchData();
+			watchChildren();
+		}
+		return this;
+	}
+
+	/**
+	 * Detach this node by avoding the next re-registration of the watchers.
+	 * This method will not be invoked implicitly even when all listeners are
+	 * removed (the cached data value and children set would still be maintained).
+	 *
+	 * @return this object
+	 */
+	public Node detach() {
+		this.attached = false;
+		return this;
+	}
+
+	/**
+	 * Return the children for this node. If attached, it will be the cached set.
+	 * Otherwise it will synchronously retrieve the children from ZooKeeper.
 	 *
 	 * @return set of children for this node
 	 */
 	public Set<String> getChildren() {
-		return cache;
+		if (attached) {
+			return cache;
+		}
+		else {
+			try {
+				return Collections.unmodifiableSet(new HashSet<>(client.getChildren(path, false)));
+			}
+			catch (KeeperException e) {
+				throw new RuntimeException("failed to get children", e);
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("interrupted while getting children", e);
+			}
+		}
+	}
+
+	/**
+	 * Return the data for this node. If attached, it will be the cached value.
+	 * Otherwise it will synchronously retrieve the data from ZooKeeper.
+	 *
+	 * @return data for this node
+	 */
+	public byte[] getData() {
+		if (attached) {
+			return data;
+		}
+		else {
+			try {
+				return client.getData(path, false, null);
+			}
+			catch (KeeperException e) {
+				throw new RuntimeException("failed to get data", e);
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("interrupted while getting data", e);
+			}
+		}
 	}
 
 	/**
@@ -173,6 +255,15 @@ public class Node {
 	 * @param listener node listener to add
 	 */
 	public void addListener(NodeListener listener) {
+		if (!attached) {
+			try {
+				this.attach();
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("failed to attach to znode", e);
+			}
+		}
 		listeners.add(listener);
 	}
 
@@ -202,7 +293,9 @@ public class Node {
 
 		@Override
 		public void process(WatchedEvent event) {
-			watchChildren();
+			if (attached) {
+				watchChildren();
+			}
 		}
 	}
 
@@ -284,7 +377,9 @@ public class Node {
 
 		@Override
 		public void process(WatchedEvent event) {
-			watchData();
+			if (attached) {
+				watchData();
+			}
 		}
 	}
 
