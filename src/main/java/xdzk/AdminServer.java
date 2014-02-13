@@ -3,9 +3,6 @@ package xdzk;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -14,7 +11,6 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
@@ -45,15 +41,10 @@ public class AdminServer extends AbstractServer implements Candidate {
 	private static final Logger LOG = LoggerFactory.getLogger(AbstractServer.class);
 
 	/**
-	 * Indicates whether this admin is currently the leader.
-	 */
-	private volatile boolean leader;
-
-	/**
 	 * Node used to track containers in the same cluster as this admin.
 	 */
 	// Marked as volatile because this reference is updated by the
-	// ZK event dispatch thread and is read by public method getContainers
+	// ZK event dispatch thread and is read by public method getContainerPaths
 	private volatile Node containers;
 
 	/**
@@ -62,15 +53,16 @@ public class AdminServer extends AbstractServer implements Candidate {
 	private final NodeListener containerListener = new ContainerListener();
 
 	/**
-	 * Watcher instance that watches the {@code /xd/streams} znode path.
+	 * Node used to track stream deployment requests.
 	 */
-	private final StreamPathWatcher streamPathWatcher = new StreamPathWatcher();
+	// Marked as volatile because this reference is updated by the
+	// ZK event dispatch thread and is read by public method getStreamPaths
+	private volatile Node streams;
 
 	/**
-	 * Callback instance that is invoked to process the result of
-	 * {@link ZooKeeper#getChildren} on the {@code /xd/streams} znode.
+	 * {@link zk.node.NodeListener} implementation that handles stream additions and removals.
 	 */
-	private final StreamPathCallback streamPathCallback = new StreamPathCallback();
+	private final NodeListener streamListener = new StreamListener();
 
 	/**
 	 * Callback instance that is invoked to process the result of
@@ -80,13 +72,6 @@ public class AdminServer extends AbstractServer implements Candidate {
 
 	// TODO: make this pluggable
 	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
-
-	/**
-	 * Set of current stream paths under {@code /xd/streams}.
-	 */
-	// Marked as volatile because this reference is updated by the
-	// ZK event dispatch thread and is read by public method getStreamPaths
-	private volatile Set<String> streamPaths = Collections.emptySet();
 
 
 	/**
@@ -121,7 +106,7 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 * @return read-only set of stream paths
 	 */
 	public Set<String> getStreamPaths() {
-		return streamPaths;
+		return streams.getChildren();
 	}
 
 	/**
@@ -204,33 +189,35 @@ public class AdminServer extends AbstractServer implements Candidate {
 	}
 
 	/**
-	 * Asynchronously obtain a list of children under {@code /xd/streams}.
-	 *
-	 * @see xdzk.AdminServer.StreamPathWatcher
-	 * @see xdzk.AdminServer.StreamPathCallback
-	 */
-	private void watchStreamDeploymentRequests() {
-		getClient().getChildren(Path.STREAMS.toString(), streamPathWatcher, streamPathCallback, null);
-	}
-
-	/**
 	 * Callback method that is invoked when the current Admin server instance
 	 * has been elected to take leadership.
 	 */
 	@Override
 	public void elect() {
-		this.leader = true;
 		LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
-		watchStreamDeploymentRequests();
 		// TODO: consider a resign() method and a latch
 		try {
+			streams = new Node(getClient(), Path.STREAMS.toString());
+			streams.addListener(streamListener);
+			streams.init();
 			// for now, we're just hanging out here to maintain leadership
 			Thread.sleep(Long.MAX_VALUE);
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}
-		this.leader = false;
+		streams.removeListener(streamListener);
+		// TODO: how do we deactivate a Node?
+		// Perhaps the Node's ChildWatcher needs a boolean flag which could
+		// be toggled via start/stop methods on the Node class, e.g.
+		/*class ChildWatcher implements Watcher {
+			@Override
+			public void process(WatchedEvent event) {
+				if (active) {
+					watchChildren();
+				}
+			}
+		}*/
 	}
 
 	/**
@@ -297,65 +284,26 @@ public class AdminServer extends AbstractServer implements Candidate {
 	}
 
 	/**
-	 * Watcher implementation that watches the {@code /xd/streams} znode path.
+	 * {@link zk.node.NodeListener} implementation that handles stream deployment requests.
+	 * <p/>
+	 * When children are added, this listener initiates the handling of each stream deployment
+	 * request, ultimately delegating to the container matcher to determine where each module of a
+	 * stream should be deployed, then writing the module deployment requests into the
+	 * {@code /xd/deployments} znode.
 	 */
-	class StreamPathWatcher implements Watcher {
+	class StreamListener implements NodeListener {
+
 		@Override
-		public void process(WatchedEvent event) {
-			LOG.info(">> StreamPathWatcher event: {}", event);
-			if (leader) {
-				watchStreamDeploymentRequests();
-			}
-		}
-	}
-
-	/**
-	 * Callback implementation that is invoked to process the result of
-	 * {@link ZooKeeper#getChildren} on the {@code /xd/streams} znode.
-	 */
-	class StreamPathCallback implements AsyncCallback.ChildrenCallback {
-		/**
-		 * {@inheritDoc}
-		 * <p>
-		 * This callback reads stream deployment requests and delegates
-		 * to the container matcher to determine where each module of a
-		 * stream should be deployed. It then writes the module deployment
-		 * requests into the {@code /xd/deployments} znode.
-		 */
-		@Override
-		public void processResult(int rc, String path, Object ctx, List<String> children) {
-			LOG.info(">> StreamPathCallback result: {}, {}, {}, {}", rc, path, ctx, children);
-
-			Set<String> arrived = new HashSet<>();
-			Set<String> departed = new HashSet<>();
-			if (children == null) {
-				children = Collections.emptyList();
-			}
-
-			for (String child : children) {
-				if (!streamPaths.contains(child)) {
-					arrived.add(child);
-				}
-			}
-
-			Set<String> newPaths = Collections.unmodifiableSet(new HashSet<>(children));
-			for (String child : streamPaths) {
-				if (!newPaths.contains(child)) {
-					departed.add(child);
-				}
-			}
-
-			streamPaths = newPaths;
-
-			// todo: consider a pluggable listener for new and departed streams
-
-			LOG.info("New streams:      {}", arrived);
-			LOG.info("Departed streams: {}", departed);
-			LOG.info("All streams:      {}", streamPaths);
-
-			for (String streamName : arrived) {
+		public void onChildrenAdded(Set<String> children) {
+			LOG.info("Streams added: {}", children);
+			for (String streamName : children) {
 				deployStream(streamName);
 			}
+		}
+
+		@Override
+		public void onChildrenRemoved(Set<String> children) {
+			LOG.info("Streams removed: {}", children);
 		}
 	}
 
