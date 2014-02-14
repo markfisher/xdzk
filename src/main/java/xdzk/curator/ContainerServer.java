@@ -6,10 +6,10 @@ import org.apache.curator.framework.recipes.cache.PathChildrenCache;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.curator.framework.state.ConnectionState;
+import org.apache.curator.utils.EnsurePath;
 import org.apache.zookeeper.CreateMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xdzk.Path;
 
 import java.lang.management.ManagementFactory;
 import java.util.HashMap;
@@ -30,15 +30,20 @@ public class ContainerServer extends AbstractServer {
 	private static final Logger LOG = LoggerFactory.getLogger(ContainerServer.class);
 
 	/**
-	 * Cache of children under {@code /xd/deployments/[this-container-id]}.
-	 */
-	private final PathChildrenCache deployments;
-
-	/**
 	 * A {@link PathChildrenCacheListener} implementation that handles deployment
 	 * requests (and deployment removals) for this container.
 	 */
 	private final DeploymentListener deploymentListener = new DeploymentListener();
+
+	/**
+	 * Cache of children under the deployments path.
+	 */
+	private volatile PathChildrenCache deployments;
+
+	/**
+	 * Utility to ensure that the deployments path exists.
+	 */
+	private volatile EnsurePath deploymentEnsurePath;
 
 	/**
 	 * Server constructor.
@@ -47,8 +52,6 @@ public class ContainerServer extends AbstractServer {
 	 */
 	public ContainerServer(String hostPort) {
 		super(hostPort);
-		deployments = new PathChildrenCache(getClient(), Path.DEPLOYMENTS + "/" + this.getId(), false);
-		deployments.getListenable().addListener(deploymentListener);
 	}
 
 	/**
@@ -61,9 +64,13 @@ public class ContainerServer extends AbstractServer {
 		try {
 			CuratorFramework client = getClient();
 
-			if (client.checkExists().forPath(Path.CONTAINERS.toString()) == null) {
-				client.create().creatingParentsIfNeeded().forPath(Path.CONTAINERS.toString());
+			if (deploymentEnsurePath == null) {
+				deploymentEnsurePath = client.newNamespaceAwareEnsurePath(Paths.DEPLOYMENTS);
 			}
+			deploymentEnsurePath.ensure(client.getZookeeperClient());
+
+			deployments = new PathChildrenCache(getClient(), Paths.DEPLOYMENTS + "/" + this.getId(), false);
+			deployments.getListenable().addListener(deploymentListener);
 
 			Map<String, String> attributes = new HashMap<>();
 			String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
@@ -72,7 +79,7 @@ public class ContainerServer extends AbstractServer {
 			attributes.put("host", tokens[1]);
 
 			client.create().withMode(CreateMode.EPHEMERAL).forPath(
-					Path.CONTAINERS + "/" + this.getId(), attributes.toString().getBytes());
+					Paths.CONTAINERS + "/" + this.getId(), attributes.toString().getBytes());
 
 			deployments.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
 
@@ -90,6 +97,8 @@ public class ContainerServer extends AbstractServer {
 	 */
 	protected void onDisconnect(ConnectionState newState) {
 		try {
+			LOG.warn(">>> disconnected: {}", newState);
+			deployments.getListenable().removeListener(deploymentListener);
 			deployments.close();
 		}
 		catch (Exception e) {
