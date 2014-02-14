@@ -11,6 +11,6 @@ public interface Candidate {
 	 * Method invoked if this candidate should assume leadership.
 	 * Do not exit this method until relinquishing leadership.
 	 */
-	void elect();
+	void lead();
 
 }

@@ -138,7 +138,7 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 * has been elected to take leadership.
 	 */
 	@Override
-	public void elect() {
+	public void lead() {
 		LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
 		// TODO: consider a resign() method and a latch
 		try {

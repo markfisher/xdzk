@@ -33,7 +33,7 @@ public class Nomination {
 	 * Status of this nomination.
 	 */
 	private enum Status {
-		SUBMITTING,
+		PENDING,
 		ELECTED,
 		REJECTED
 	}
@@ -246,7 +246,7 @@ public class Nomination {
 				executor.execute(new Runnable() {
 					@Override
 					public void run() {
-						candidate.elect();
+						candidate.lead();
 						// the elect method should block until resignation
 						handleResignation();
 					}
@@ -278,7 +278,7 @@ public class Nomination {
 				break;
 			case OK:
 				if (stat == null) {
-					status = Status.SUBMITTING;
+					status = Status.PENDING;
 					requestLeadership();
 				}
 				break;

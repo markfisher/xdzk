@@ -38,7 +38,7 @@ public class ElectionDemo {
 		}
 
 		@Override
-		public void elect() {
+		public void lead() {
 			LOG.info("Elected!");
 			while (latch.getCount() > 0) {
 				latch.countDown();
