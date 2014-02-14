@@ -133,6 +133,7 @@ public class ContainerServer extends AbstractServer {
 
 		@Override
 		public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
+			LOG.debug("Path cache event: {}", event);
 			switch (event.getType()) {
 				case INITIALIZED:
 					// todo: when the cache is initialized the getInitialData
@@ -151,6 +152,8 @@ public class ContainerServer extends AbstractServer {
 					break;
 				case CHILD_REMOVED:
 					onDeploymentRemoved(stripPath(event.getData().getPath()));
+					break;
+				default:
 					break;
 			}
 		}
