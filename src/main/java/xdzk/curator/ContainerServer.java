@@ -6,7 +6,6 @@ import org.apache.curator.framework.recipes.cache.PathChildrenCache;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.curator.framework.state.ConnectionState;
-import org.apache.curator.utils.EnsurePath;
 import org.apache.zookeeper.CreateMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,11 +40,6 @@ public class ContainerServer extends AbstractServer {
 	private volatile PathChildrenCache deployments;
 
 	/**
-	 * Utility to ensure that the deployments path exists.
-	 */
-	private volatile EnsurePath deploymentEnsurePath;
-
-	/**
 	 * Server constructor.
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
@@ -64,12 +58,10 @@ public class ContainerServer extends AbstractServer {
 		try {
 			CuratorFramework client = getClient();
 
-			if (deploymentEnsurePath == null) {
-				deploymentEnsurePath = client.newNamespaceAwareEnsurePath(Paths.DEPLOYMENTS);
-			}
-			deploymentEnsurePath.ensure(client.getZookeeperClient());
+			Paths.ensurePath(client, Paths.DEPLOYMENTS);
+			Paths.ensurePath(client, Paths.CONTAINERS);
 
-			deployments = new PathChildrenCache(getClient(), Paths.DEPLOYMENTS + "/" + this.getId(), false);
+			deployments = new PathChildrenCache(client, Paths.DEPLOYMENTS + "/" + this.getId(), false);
 			deployments.getListenable().addListener(deploymentListener);
 
 			Map<String, String> attributes = new HashMap<>();
@@ -124,20 +116,6 @@ public class ContainerServer extends AbstractServer {
 		LOG.info("Deployment removed: {}", deployment);
 	}
 
-	/**
-	 * Strip path information from a string. For example,
-	 * given an input of {@code /xd/path/location}, return
-	 * {@code location}.
-	 *
-	 * @param path path string
-	 *
-	 * @return string with path stripped
-	 */
-	private String stripPath(String path) {
-		// todo: error handling
-		return path.substring(path.lastIndexOf('/') + 1);
-	}
-
 	class DeploymentListener implements PathChildrenCacheListener {
 
 		@Override
@@ -153,14 +131,14 @@ public class ContainerServer extends AbstractServer {
 					// For now just (wrongly) assume that everything
 					// should be deployed.
 					for (ChildData data : event.getInitialData()) {
-						onDeploymentAdded(stripPath(data.getPath()));
+						onDeploymentAdded(Paths.stripPath(data.getPath()));
 					}
 					break;
 				case CHILD_ADDED:
-					onDeploymentAdded(stripPath(event.getData().getPath()));
+					onDeploymentAdded(Paths.stripPath(event.getData().getPath()));
 					break;
 				case CHILD_REMOVED:
-					onDeploymentRemoved(stripPath(event.getData().getPath()));
+					onDeploymentRemoved(Paths.stripPath(event.getData().getPath()));
 					break;
 				default:
 					break;
