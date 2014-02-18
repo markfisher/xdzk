@@ -9,7 +9,6 @@ import org.apache.curator.framework.state.ConnectionState;
 import org.apache.zookeeper.CreateMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import xdzk.Path;
 
 import java.lang.management.ManagementFactory;
 import java.util.HashMap;
@@ -30,15 +29,15 @@ public class ContainerServer extends AbstractServer {
 	private static final Logger LOG = LoggerFactory.getLogger(ContainerServer.class);
 
 	/**
-	 * Cache of children under {@code /xd/deployments/[this-container-id]}.
-	 */
-	private final PathChildrenCache deployments;
-
-	/**
 	 * A {@link PathChildrenCacheListener} implementation that handles deployment
 	 * requests (and deployment removals) for this container.
 	 */
 	private final DeploymentListener deploymentListener = new DeploymentListener();
+
+	/**
+	 * Cache of children under the deployments path.
+	 */
+	private volatile PathChildrenCache deployments;
 
 	/**
 	 * Server constructor.
@@ -47,8 +46,6 @@ public class ContainerServer extends AbstractServer {
 	 */
 	public ContainerServer(String hostPort) {
 		super(hostPort);
-		deployments = new PathChildrenCache(getClient(), Path.DEPLOYMENTS + "/" + this.getId(), false);
-		deployments.getListenable().addListener(deploymentListener);
 	}
 
 	/**
@@ -61,9 +58,11 @@ public class ContainerServer extends AbstractServer {
 		try {
 			CuratorFramework client = getClient();
 
-			if (client.checkExists().forPath(Path.CONTAINERS.toString()) == null) {
-				client.create().creatingParentsIfNeeded().forPath(Path.CONTAINERS.toString());
-			}
+			Paths.ensurePath(client, Paths.DEPLOYMENTS);
+			Paths.ensurePath(client, Paths.CONTAINERS);
+
+			deployments = new PathChildrenCache(client, Paths.DEPLOYMENTS + "/" + this.getId(), false);
+			deployments.getListenable().addListener(deploymentListener);
 
 			Map<String, String> attributes = new HashMap<>();
 			String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
@@ -72,7 +71,7 @@ public class ContainerServer extends AbstractServer {
 			attributes.put("host", tokens[1]);
 
 			client.create().withMode(CreateMode.EPHEMERAL).forPath(
-					Path.CONTAINERS + "/" + this.getId(), attributes.toString().getBytes());
+					Paths.CONTAINERS + "/" + this.getId(), attributes.toString().getBytes());
 
 			deployments.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
 
@@ -90,6 +89,8 @@ public class ContainerServer extends AbstractServer {
 	 */
 	protected void onDisconnect(ConnectionState newState) {
 		try {
+			LOG.warn(">>> disconnected: {}", newState);
+			deployments.getListenable().removeListener(deploymentListener);
 			deployments.close();
 		}
 		catch (Exception e) {
@@ -115,20 +116,6 @@ public class ContainerServer extends AbstractServer {
 		LOG.info("Deployment removed: {}", deployment);
 	}
 
-	/**
-	 * Strip path information from a string. For example,
-	 * given an input of {@code /xd/path/location}, return
-	 * {@code location}.
-	 *
-	 * @param path path string
-	 *
-	 * @return string with path stripped
-	 */
-	private String stripPath(String path) {
-		// todo: error handling
-		return path.substring(path.lastIndexOf('/') + 1);
-	}
-
 	class DeploymentListener implements PathChildrenCacheListener {
 
 		@Override
@@ -144,14 +131,14 @@ public class ContainerServer extends AbstractServer {
 					// For now just (wrongly) assume that everything
 					// should be deployed.
 					for (ChildData data : event.getInitialData()) {
-						onDeploymentAdded(stripPath(data.getPath()));
+						onDeploymentAdded(Paths.stripPath(data.getPath()));
 					}
 					break;
 				case CHILD_ADDED:
-					onDeploymentAdded(stripPath(event.getData().getPath()));
+					onDeploymentAdded(Paths.stripPath(event.getData().getPath()));
 					break;
 				case CHILD_REMOVED:
-					onDeploymentRemoved(stripPath(event.getData().getPath()));
+					onDeploymentRemoved(Paths.stripPath(event.getData().getPath()));
 					break;
 				default:
 					break;

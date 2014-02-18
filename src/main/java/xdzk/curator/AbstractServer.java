@@ -53,7 +53,10 @@ public class AbstractServer implements Runnable {
 	 */
 	AbstractServer(String hostPort) {
 		id = UUID.randomUUID().toString();
-		client = CuratorFrameworkFactory.newClient(hostPort, retryPolicy);
+		client = CuratorFrameworkFactory.builder()
+				.namespace(Paths.XD_NAMESPACE)
+				.retryPolicy(retryPolicy)
+				.connectString(hostPort).build();
 		client.getConnectionStateListenable().addListener(connectionListener);
 	}
 
