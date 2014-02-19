@@ -40,18 +40,17 @@ public class AdminServer extends AbstractServer {
 	private static final Logger LOG = LoggerFactory.getLogger(AbstractServer.class);
 
 	/**
-	 * Singleton instance of the Admin server.
+	 * Singleton instance of the Admin server. Marked volatile because this reference
+	 * is updated by the main thread and is read by the {@link CurrentContainers} callable.
 	 */
-	// volatile because this reference is updated by the
-	// main thread and is read by the CurrentContainers callable.
 	public static volatile AdminServer INSTANCE;
 
 	/**
 	 * Cache of children under the containers path. This path is used to track
-	 * containers in the cluster.
+	 * containers in the cluster. Marked volatile because this reference is
+	 * updated by the Curator event dispatch thread and read by public method
+	 * {@link #getContainerPaths}.
 	 */
-	// volatile because this reference is updated by the Curator event dispatch
-    // thread and read by public method getContainerPaths
 	private volatile PathChildrenCache containers;
 
 	/**
@@ -61,21 +60,22 @@ public class AdminServer extends AbstractServer {
 
 	/**
 	 * Cache of children under the streams path. This path is used to track stream
-	 * deployment requests.
+	 * deployment requests. Marked volatile because this reference is written by
+	 * the Curator thread that handles leader election and read by public
+	 * method {@link #getStreamPaths}.
 	 */
-	// volatile because this reference is written by the Curator thread that
-	// handles leader election and read by public method getStreamPaths
-	// todo: perhaps this does not need to be a member since getStreamPaths
-	// isn't invoked at the moment
+	/*
+	 * todo: perhaps this does not need to be a member since getStreamPaths
+	 * isn't invoked at the moment
+	 */
 	private volatile PathChildrenCache streams;
 
 	/**
 	 * Leader selector to elect admin server that will handle stream
-	 * deployment requests.
+	 * deployment requests. Marked volatile because this reference is
+	 * written and read by the Curator event dispatch threads - there
+	 * is no guarantee that the same thread will do the reading and writing.
 	 */
-	// volatile because this reference is written and read by the Curator
-	// event dispatch threads - there is no guarantee that the same thread
-	// will do the reading and writing
 	private volatile LeaderSelector leaderSelector;
 
 	/**
@@ -234,6 +234,7 @@ public class AdminServer extends AbstractServer {
 					break;
 				case CHILD_REMOVED:
 					LOG.info("Container removed: {}", child);
+					break;
 				case CONNECTION_SUSPENDED:
 					break;
 				case CONNECTION_RECONNECTED:
@@ -262,6 +263,10 @@ public class AdminServer extends AbstractServer {
 				streams.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
 
 				Thread.sleep(Long.MAX_VALUE);
+			}
+			catch (InterruptedException e) {
+				LOG.debug("Leadership canceled due to thread interrupt");
+				Thread.currentThread().interrupt();
 			}
 			finally {
 				streams.getListenable().removeListener(streamListener);

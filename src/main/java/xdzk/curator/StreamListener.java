@@ -111,7 +111,7 @@ class StreamListener implements PathChildrenCacheListener {
 		LOG.info("Deploying module '{}' to container: {}", module, container);
 
 		try {
-			// todo: we need to specify whether container will contain the leading slash
+		// todo: we need to specify whether container will contain the leading slash
 //		client.create().creatingParentsIfNeeded().forPath(Paths.DEPLOYMENTS + '/' + container + '/' + module);
 			client.create().creatingParentsIfNeeded().forPath(Paths.DEPLOYMENTS + container + '/' + module);
 		}
