@@ -226,7 +226,11 @@ public class AdminServer extends AbstractServer implements Candidate {
 	 * @param module the name of the module to be deployed
 	 */
 	private void deployModule(String module) {
-		String container = this.containerMatcher.match(module, getContainerPaths());
+		// Since the interface definition for ContainerMatcher changed to require
+		// an Iterator<Container>, just going to skip ContainerMatcher usage
+		// and simply select the first container path found.
+		String container = getContainerPaths().iterator().next(); // TODO: REVISIT
+
 		LOG.info("deploying module '{}' to container: {}", module, container);
 		try {
 			getClient().create(Path.DEPLOYMENTS + "/" + container + "/" + module, null,

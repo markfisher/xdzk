@@ -22,17 +22,24 @@ class StreamListener implements PathChildrenCacheListener {
 	private final Logger LOG = LoggerFactory.getLogger(StreamListener.class);
 
 	/**
-	 * Admin server that this listener is attached to.
+	 * Provides access to the current container list.
 	 */
-	private final AdminServer adminServer;
+	private final ContainerAware containerAware;
+
+	/**
+	 * Matches a deployment request to a container.
+	 */
+	private final ContainerMatcher matcher;
 
 	/**
 	 * Construct a StreamListener.
 	 *
-	 * @param adminServer admin server that this listener is attached to
+	 * @param containerAware admin server that this listener is attached to
 	 */
-	public StreamListener(AdminServer adminServer) {
-		this.adminServer = adminServer;
+	public StreamListener(ContainerAware containerAware, ContainerMatcher matcher) {
+		this.containerAware = containerAware;
+		this.matcher = matcher;
+
 	}
 
 	/**
@@ -106,7 +113,11 @@ class StreamListener implements PathChildrenCacheListener {
 	 * @param module the name of the module to be deployed
 	 */
 	private void deployModule(CuratorFramework client, String module) throws Exception {
-		String container = adminServer.getContainerMatcher().match(module, adminServer.getContainerPaths());
+		Container container = matcher.match(module, containerAware.getContainerIterator());
+		if (container == null) {
+			LOG.info("No container available to deploy module {}", module);
+			return;
+		}
 
 		LOG.info("Deploying module '{}' to container: {}", module, container);
 

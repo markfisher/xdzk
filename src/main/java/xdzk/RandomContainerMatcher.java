@@ -1,8 +1,11 @@
 package xdzk;
 
+import xdzk.curator.Container;
+
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
-import java.util.Set;
 
 /**
  * Implementation of the {@link ContainerMatcher} strategy that selects any one of the candidate containers at random.
@@ -10,17 +13,18 @@ import java.util.Set;
  * @author Mark Fisher
  */
 public class RandomContainerMatcher implements ContainerMatcher {
+	private static final Random RANDOM = new Random();
 
 	/**
 	 * Randomly selects one of the candidate containers.
 	 */
 	@Override
-	public String match(String module, Set<String> candidates) {
-		if (candidates == null || candidates.size() == 0) {
-			return null;
+	public Container match(String module, Iterator<Container> candidates) {
+		List<Container> containers = new ArrayList<>();
+		while (candidates.hasNext()) {
+			containers.add(candidates.next());
 		}
-		int i = new Random().nextInt(candidates.size());
-		return new ArrayList<>(candidates).get(i);
+		return containers.isEmpty() ? null : containers.get(RANDOM.nextInt(containers.size()));
 	}
 
 }

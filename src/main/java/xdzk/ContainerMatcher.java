@@ -1,6 +1,8 @@
 package xdzk;
 
-import java.util.Set;
+import xdzk.curator.Container;
+
+import java.util.Iterator;
 
 /**
  * Strategy interface for matching a ModuleDeploymentRequest to one of the candidate container nodes.
@@ -21,6 +23,6 @@ public interface ContainerMatcher {
 	// metadata extracted from the stream deployment manifest, such as the number of instances.
 	// Also, the String return and collection element type should be Container instances
 	// where ultimately matching will take Container attributes and metrics into consideration.
-	String match(String module, Set<String> candidates);
+	Container match(String module, Iterator<Container> candidates);
 
 }

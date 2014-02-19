@@ -11,13 +11,23 @@ import org.apache.curator.framework.recipes.leader.LeaderSelectorListenerAdapter
 import org.apache.curator.framework.state.ConnectionState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.springframework.core.convert.converter.Converter;
+
 import xdzk.ContainerMatcher;
 import xdzk.RandomContainerMatcher;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -32,7 +42,7 @@ import java.util.concurrent.Callable;
  * @author Patrick Peralta
  * @author Mark Fisher
  */
-public class AdminServer extends AbstractServer {
+public class AdminServer extends AbstractServer implements ContainerAware {
 
 	/**
 	 * Logger.
@@ -89,6 +99,11 @@ public class AdminServer extends AbstractServer {
 	// TODO: make this pluggable
 	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
 
+	/**
+	 * Converter from {@link ChildData} types to {@link xdzk.curator.Container}.
+	 */
+	private final ContainerConverter containerConverter = new ContainerConverter();
+
 
 	/**
 	 * Server constructor.
@@ -130,6 +145,14 @@ public class AdminServer extends AbstractServer {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public Iterator<Container> getContainerIterator() {
+		return new ChildPathIterator<Container>(containerConverter, containers);
+	}
+
+	/**
 	 * Return the configured {@link xdzk.ContainerMatcher}. This matcher
 	 * is used to match a container to a module deployment request.
 	 *
@@ -157,7 +180,7 @@ public class AdminServer extends AbstractServer {
 			Paths.ensurePath(client, Paths.CONTAINERS);
 			Paths.ensurePath(client, Paths.STREAMS);
 
-			containers = new PathChildrenCache(client, Paths.CONTAINERS, false);
+			containers = new PathChildrenCache(client, Paths.CONTAINERS, true);
 			containers.getListenable().addListener(containerListener);
 			containers.start();
 
@@ -216,6 +239,41 @@ public class AdminServer extends AbstractServer {
 		}
 	}
 
+	/**
+	 * Converts a {@link org.apache.curator.framework.recipes.cache.ChildData} node
+	 * to a {@link xdzk.curator.Container}.
+	 */
+	public static class ContainerConverter implements Converter<ChildData, Container> {
+
+		@Override
+		public Container convert(ChildData source) {
+			// This converter will be invoked upon every iteration of the
+			// iterator returned by getContainerIterator. While elegant,
+			// this isn't exactly efficient. TODO - revisit
+			try {
+				Map<String, String> attributes = new HashMap<>();
+				byte[] data = source.getData();
+
+				if (data != null) {
+					BufferedReader reader = new BufferedReader(new InputStreamReader(
+							new ByteArrayInputStream(source.getData())));
+
+					String line;
+					while ((line = reader.readLine()) != null) {
+						if (!line.startsWith("#") && !line.isEmpty()) {
+							String[] pair = line.trim().split("=");
+							attributes.put(pair[0].trim(), pair[1].trim());
+						}
+					}
+				}
+
+				return new Container(source.getPath(), attributes);
+			}
+			catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
 
 	/**
 	 * Listener implementation that is invoked when containers are added/removed/modified.
@@ -230,7 +288,7 @@ public class AdminServer extends AbstractServer {
 					LOG.info("Container added: {}", child);
 					break;
 				case CHILD_UPDATED:
-					LOG.info("Container updated: ", child);
+					LOG.info("Container updated: {}", child);
 					break;
 				case CHILD_REMOVED:
 					LOG.info("Container removed: {}", child);
@@ -255,7 +313,7 @@ public class AdminServer extends AbstractServer {
 		@Override
 		public void takeLeadership(CuratorFramework client) throws Exception {
 			LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
-			PathChildrenCacheListener streamListener = new StreamListener(AdminServer.this);
+			PathChildrenCacheListener streamListener = new StreamListener(AdminServer.this, containerMatcher);
 
 			try {
 				streams = new PathChildrenCache(client, Paths.STREAMS, false);
