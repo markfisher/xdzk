@@ -207,6 +207,10 @@ public class AdminServer extends AbstractServer implements ContainerAware {
 			containers.getListenable().removeListener(containerListener);
 			containers.close();
 		}
+		catch (IllegalStateException e) {
+			// IllegalStateException is thrown if leaderSelector or
+			// containers have already been closed
+		}
 		catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -282,16 +286,15 @@ public class AdminServer extends AbstractServer implements ContainerAware {
 
 		@Override
 		public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
-			String child = Paths.stripPath(event.getData().getPath());
 			switch (event.getType()) {
 				case CHILD_ADDED:
-					LOG.info("Container added: {}", child);
+					LOG.info("Container added: {}", Paths.stripPath(event.getData().getPath()));
 					break;
 				case CHILD_UPDATED:
-					LOG.info("Container updated: {}", child);
+					LOG.info("Container updated: {}", Paths.stripPath(event.getData().getPath()));
 					break;
 				case CHILD_REMOVED:
-					LOG.info("Container removed: {}", child);
+					LOG.info("Container removed: {}", Paths.stripPath(event.getData().getPath()));
 					break;
 				case CONNECTION_SUSPENDED:
 					break;
@@ -323,7 +326,7 @@ public class AdminServer extends AbstractServer implements ContainerAware {
 				Thread.sleep(Long.MAX_VALUE);
 			}
 			catch (InterruptedException e) {
-				LOG.debug("Leadership canceled due to thread interrupt");
+				LOG.info("Leadership canceled due to thread interrupt");
 				Thread.currentThread().interrupt();
 			}
 			finally {
