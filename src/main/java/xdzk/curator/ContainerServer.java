@@ -64,18 +64,19 @@ public class ContainerServer extends AbstractServer {
 			deployments = new PathChildrenCache(client, Paths.DEPLOYMENTS + "/" + this.getId(), false);
 			deployments.getListenable().addListener(deploymentListener);
 
-			Map<String, String> attributes = new HashMap<>();
 			String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
 			String tokens[] = mxBeanName.split("@");
-			attributes.put("pid", tokens[0]);
-			attributes.put("host", tokens[1]);
+			StringBuilder builder = new StringBuilder()
+					.append("pid=").append(tokens[0])
+					.append(System.lineSeparator())
+					.append("host=").append(tokens[1]);
 
 			client.create().withMode(CreateMode.EPHEMERAL).forPath(
-					Paths.CONTAINERS + "/" + this.getId(), attributes.toString().getBytes());
+					Paths.CONTAINERS + "/" + this.getId(), builder.toString().getBytes("UTF-8"));
 
 			deployments.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
 
-			LOG.info("Started container {} with attributes: {} ", this.getId(), attributes);
+			LOG.info("Started container {} with attributes: {} ", this.getId(), builder);
 		}
 		catch (Exception e) {
 			throw new RuntimeException(e);
