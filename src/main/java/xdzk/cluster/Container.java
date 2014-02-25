@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk.curator;
+package xdzk.cluster;
 
 import java.util.Collections;
 import java.util.HashMap;

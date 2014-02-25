@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk.curator;
+package xdzk.server;
 
 import java.util.UUID;
 
@@ -26,6 +26,7 @@ import org.apache.curator.framework.state.ConnectionStateListener;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import xdzk.curator.Paths;
 
 /**
  * Common base class for servers that need to coordinate via ZooKeeper.

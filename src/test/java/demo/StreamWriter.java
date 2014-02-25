@@ -24,7 +24,6 @@ import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import xdzk.curator.AdminServerTest;
 import xdzk.curator.Paths;
 
 /**
@@ -32,7 +31,7 @@ import xdzk.curator.Paths;
  */
 public class StreamWriter {
 
-	private static final Logger LOG = LoggerFactory.getLogger(AdminServerTest.class);
+	private static final Logger LOG = LoggerFactory.getLogger(StreamWriter.class);
 
 	public static void main(String[] args) throws Exception {
 		ZooKeeper zk = new ZooKeeper("localhost:2181", 15000, new ZkWatcher());

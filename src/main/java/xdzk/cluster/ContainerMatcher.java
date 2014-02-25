@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package xdzk;
+package xdzk.cluster;
 
 import java.util.Iterator;
 
-import xdzk.curator.Container;
 
 /**
  * Strategy interface for matching a ModuleDeploymentRequest to one of the candidate container nodes.

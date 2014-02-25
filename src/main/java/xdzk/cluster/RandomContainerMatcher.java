@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-package xdzk;
+package xdzk.cluster;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
-
-import xdzk.curator.Container;
 
 /**
  * Implementation of the {@link ContainerMatcher} strategy that selects any one of the candidate containers at random.

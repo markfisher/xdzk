@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk.curator;
+package xdzk.admin;
 
 import static com.oracle.tools.deferred.DeferredHelper.eventually;
 import static com.oracle.tools.deferred.DeferredHelper.invoking;
@@ -43,10 +43,12 @@ import com.oracle.tools.runtime.java.NativeJavaApplicationBuilder;
 import com.oracle.tools.runtime.java.SimpleJavaApplication;
 import com.oracle.tools.runtime.java.SimpleJavaApplicationSchema;
 import com.oracle.tools.util.CompletionListener;
+import xdzk.server.AdminServer;
+import xdzk.server.ContainerServer;
 
 /**
- * Test to assert the ability of {@link AdminServer} to observe
- * the number of {@link ContainerServer} instances in a cluster.
+ * Test to assert the ability of {@link xdzk.server.AdminServer} to observe
+ * the number of {@link xdzk.server.ContainerServer} instances in a cluster.
  *
  * @author Patrick Peralta
  */
@@ -71,7 +73,7 @@ public class AdminContainerObserverTest {
 	 * @throws IOException
 	 */
 	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz) throws IOException {
-		return launch(clz, null);
+		return launch(clz, (String[]) null);
 	}
 
 	/**
@@ -141,7 +143,7 @@ public class AdminContainerObserverTest {
 	 * <ol>
 	 *     <li>Launch a ZooKeeper standalone server</li>
 	 *     <li>Launch an {@link AdminServer}</li>
-	 *     <li>Launch 3 instances of {@link ContainerServer}</li>
+	 *     <li>Launch 3 instances of {@link xdzk.server.ContainerServer}</li>
 	 *     <li>Assert that the admin server sees 3 containers</li>
 	 *     <li>Shut down a container</li>
 	 *     <li>Assert that the admin server sees 2 containers</li>
@@ -171,12 +173,14 @@ public class AdminContainerObserverTest {
 			container2 = launch(ContainerServer.class, zkAddress);
 			container3 = launch(ContainerServer.class, zkAddress);
 
-			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(3));
+			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(3),
+					60, TimeUnit.SECONDS);
 
 			container3.close();
 			container3 = null;
 
-			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(2));
+			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(2),
+					60, TimeUnit.SECONDS);
 		}
 
 		finally {

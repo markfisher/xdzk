@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk.curator;
+package xdzk.server;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -44,21 +44,25 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.core.convert.converter.Converter;
 
-import xdzk.ContainerMatcher;
-import xdzk.RandomContainerMatcher;
+import xdzk.cluster.ContainerMatcher;
+import xdzk.cluster.ContainerRepository;
+import xdzk.cluster.RandomContainerMatcher;
+import xdzk.curator.ChildPathIterator;
+import xdzk.cluster.Container;
+import xdzk.curator.Paths;
 
 /**
  * Prototype implementation of an XD admin server that watches ZooKeeper
  * for Container arrivals and departures from the XD cluster. Each AdminServer
  * instance will attempt to request leadership, but at any given time only
  * one AdminServer instance in the cluster will have leadership status. Those
- * instances not elected will watch the {@link Paths#ADMIN} znode so that one
+ * instances not elected will watch the {@link xdzk.curator.Paths#ADMIN} znode so that one
  * of them will take over leadership if the leader admin closes or crashes.
  *
  * @author Patrick Peralta
  * @author Mark Fisher
  */
-public class AdminServer extends AbstractServer implements ContainerAware {
+public class AdminServer extends AbstractServer implements ContainerRepository {
 
 	/**
 	 * Logger.
@@ -116,7 +120,7 @@ public class AdminServer extends AbstractServer implements ContainerAware {
 	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
 
 	/**
-	 * Converter from {@link ChildData} types to {@link xdzk.curator.Container}.
+	 * Converter from {@link ChildData} types to {@link xdzk.cluster.Container}.
 	 */
 	private final ContainerConverter containerConverter = new ContainerConverter();
 
@@ -169,7 +173,7 @@ public class AdminServer extends AbstractServer implements ContainerAware {
 	}
 
 	/**
-	 * Return the configured {@link xdzk.ContainerMatcher}. This matcher
+	 * Return the configured {@link xdzk.cluster.ContainerMatcher}. This matcher
 	 * is used to match a container to a module deployment request.
 	 *
 	 * @return container matcher for this admin server
@@ -262,7 +266,7 @@ public class AdminServer extends AbstractServer implements ContainerAware {
 
 	/**
 	 * Converts a {@link org.apache.curator.framework.recipes.cache.ChildData} node
-	 * to a {@link xdzk.curator.Container}.
+	 * to a {@link xdzk.cluster.Container}.
 	 */
 	public static class ContainerConverter implements Converter<ChildData, Container> {
 

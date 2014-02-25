@@ -8,7 +8,6 @@ repositories {
 }
 
 dependencies {
-	compile group : 'org.apache.zookeeper', name : 'zookeeper', version: '3.4.5'
 	compile group : 'org.apache.curator', name : 'curator-recipes', version: '2.4.0'
 	compile group : 'org.apache.curator', name : 'curator-test', version: '2.4.0'
 	compile group : 'org.springframework', name: 'spring-core', version: '4.0.2.RELEASE'

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk.curator;
+package xdzk.cluster;
 
 import java.util.Iterator;
 
@@ -24,7 +24,7 @@ import java.util.Iterator;
  *
  * @author Patrick Peralta
  */
-public interface ContainerAware {
+public interface ContainerRepository {
 	/**
 	 * Return an {@link Iterator} over the available containers.
 	 *
