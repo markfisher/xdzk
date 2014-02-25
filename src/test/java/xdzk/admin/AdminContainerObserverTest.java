@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk;
+package xdzk.admin;
 
 import static com.oracle.tools.deferred.DeferredHelper.eventually;
 import static com.oracle.tools.deferred.DeferredHelper.invoking;
@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.curator.test.InstanceSpec;
+import org.apache.curator.test.TestingServer;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,10 +43,12 @@ import com.oracle.tools.runtime.java.NativeJavaApplicationBuilder;
 import com.oracle.tools.runtime.java.SimpleJavaApplication;
 import com.oracle.tools.runtime.java.SimpleJavaApplicationSchema;
 import com.oracle.tools.util.CompletionListener;
+import xdzk.server.AdminServer;
+import xdzk.server.ContainerServer;
 
 /**
- * Test to assert the ability of {@link xdzk.AdminServer} to observe
- * the number of {@link xdzk.ContainerServer} instances in a cluster.
+ * Test to assert the ability of {@link xdzk.server.AdminServer} to observe
+ * the number of {@link xdzk.server.ContainerServer} instances in a cluster.
  *
  * @author Patrick Peralta
  */
@@ -53,6 +57,11 @@ public class AdminContainerObserverTest {
 	 * Logger.
 	 */
 	private static final Logger LOG = LoggerFactory.getLogger(AdminContainerObserverTest.class);
+
+	/**
+	 * ZooKeeper port.
+	 */
+	public static final int PORT = 3181;
 
 	/**
 	 * Launch the given class's {@code main} method in a separate JVM.
@@ -64,7 +73,7 @@ public class AdminContainerObserverTest {
 	 * @throws IOException
 	 */
 	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz) throws IOException {
-		return launch(clz, null);
+		return launch(clz, (String[]) null);
 	}
 
 	/**
@@ -77,7 +86,7 @@ public class AdminContainerObserverTest {
 	 *
 	 * @throws IOException
 	 */
-	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz, String[] args) throws IOException {
+	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz, String... args) throws IOException {
 		String classpath = System.getProperty("java.class.path");
 		SimpleJavaApplicationSchema schema = new SimpleJavaApplicationSchema(clz.getName(), classpath);
 		if (args != null) {
@@ -133,8 +142,8 @@ public class AdminContainerObserverTest {
 	 * Execute the following sequence:
 	 * <ol>
 	 *     <li>Launch a ZooKeeper standalone server</li>
-	 *     <li>Launch an {@link xdzk.AdminServer}</li>
-	 *     <li>Launch 3 instances of {@link xdzk.ContainerServer}</li>
+	 *     <li>Launch an {@link AdminServer}</li>
+	 *     <li>Launch 3 instances of {@link xdzk.server.ContainerServer}</li>
 	 *     <li>Assert that the admin server sees 3 containers</li>
 	 *     <li>Shut down a container</li>
 	 *     <li>Assert that the admin server sees 2 containers</li>
@@ -143,24 +152,35 @@ public class AdminContainerObserverTest {
 	 */
 	@Test
 	public void test() throws Exception {
+		TestingServer zooKeeper = new TestingServer(new InstanceSpec(
+				null,  // dataDirectory
+				PORT,  // port
+				-1,    // electionPort
+				-1,    // quorumPort
+				true,  // deleteDataDirectoryOnClose
+				-1,    // serverId
+				500,   // tickTime
+				-1));  // maxClientCnxns
 		JavaApplication<SimpleJavaApplication> adminServer = null;
 		JavaApplication<SimpleJavaApplication> container1 = null;
 		JavaApplication<SimpleJavaApplication> container2 = null;
 		JavaApplication<SimpleJavaApplication> container3 = null;
 
 		try {
-			ZooKeeperStandalone.start();
-			adminServer = launch(AdminServer.class);
-			container1 = launch(ContainerServer.class);
-			container2 = launch(ContainerServer.class);
-			container3 = launch(ContainerServer.class);
+			String zkAddress = "localhost:" + PORT;
+			adminServer = launch(AdminServer.class, zkAddress);
+			container1 = launch(ContainerServer.class, zkAddress);
+			container2 = launch(ContainerServer.class, zkAddress);
+			container3 = launch(ContainerServer.class, zkAddress);
 
-			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(3));
+			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(3),
+					60, TimeUnit.SECONDS);
 
 			container3.close();
 			container3 = null;
 
-			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(2));
+			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(2),
+					60, TimeUnit.SECONDS);
 		}
 
 		finally {
@@ -176,7 +196,7 @@ public class AdminContainerObserverTest {
 			if (container3 != null) {
 				container3.close();
 			}
-			ZooKeeperStandalone.stop();
+			zooKeeper.stop();
 		}
 	}
 

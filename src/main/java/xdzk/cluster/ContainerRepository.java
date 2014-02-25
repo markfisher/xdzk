@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-package zk.election;
+package xdzk.cluster;
+
+import java.util.Iterator;
 
 /**
- * Interface for a candidate that can be nominated as a leader.
+ * Interface definition for an object with the ability to look up
+ * the set of containers available in the cluster.
  *
- * @author Mark Fisher
+ * @author Patrick Peralta
  */
-public interface Candidate {
-
+public interface ContainerRepository {
 	/**
-	 * Method invoked if this candidate should assume leadership.
-	 * Do not exit this method until relinquishing leadership.
+	 * Return an {@link Iterator} over the available containers.
+	 *
+	 * @return iterator over the available containers
 	 */
-	void lead();
-
+	Iterator<Container> getContainerIterator();
 }

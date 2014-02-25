@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk.curator;
+package xdzk.server;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
@@ -24,8 +24,10 @@ import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import xdzk.ContainerMatcher;
-import xdzk.Path;
+import xdzk.cluster.ContainerMatcher;
+import xdzk.cluster.Container;
+import xdzk.cluster.ContainerRepository;
+import xdzk.curator.Paths;
 
 /**
  * Listener implementation that handles stream deployment requests.
@@ -41,7 +43,7 @@ class StreamListener implements PathChildrenCacheListener {
 	/**
 	 * Provides access to the current container list.
 	 */
-	private final ContainerAware containerAware;
+	private final ContainerRepository containerRepository;
 
 	/**
 	 * Matches a deployment request to a container.
@@ -51,10 +53,10 @@ class StreamListener implements PathChildrenCacheListener {
 	/**
 	 * Construct a StreamListener.
 	 *
-	 * @param containerAware admin server that this listener is attached to
+	 * @param containerRepository admin server that this listener is attached to
 	 */
-	public StreamListener(ContainerAware containerAware, ContainerMatcher matcher) {
-		this.containerAware = containerAware;
+	public StreamListener(ContainerRepository containerRepository, ContainerMatcher matcher) {
+		this.containerRepository = containerRepository;
 		this.matcher = matcher;
 
 	}
@@ -62,7 +64,7 @@ class StreamListener implements PathChildrenCacheListener {
 	/**
 	 * {@inheritDoc}
 	 * <p/>
-	 * Handle child events for the {@link Paths#STREAMS} path.
+	 * Handle child events for the {@link xdzk.curator.Paths#STREAMS} path.
 	 */
 	@Override
 	public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
@@ -94,7 +96,7 @@ class StreamListener implements PathChildrenCacheListener {
 	}
 
 	/**
-	 * Deploy a stream for the deployment request with the given stream name under {@link Path#STREAMS}.
+	 * Deploy a stream for the deployment request with the given stream name under {@link Paths#STREAMS}.
 	 *
 	 * @param client     curator client
 	 * @param streamName the name of the stream to deploy
@@ -130,7 +132,7 @@ class StreamListener implements PathChildrenCacheListener {
 	 * @param module the name of the module to be deployed
 	 */
 	private void deployModule(CuratorFramework client, String module) throws Exception {
-		Container container = matcher.match(module, containerAware.getContainerIterator());
+		Container container = matcher.match(module, containerRepository.getContainerIterator());
 		if (container == null) {
 			LOG.info("No container available to deploy module {}", module);
 			return;

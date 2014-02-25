@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk.curator;
+package xdzk.server;
 
 import java.lang.management.ManagementFactory;
 
@@ -27,6 +27,7 @@ import org.apache.curator.framework.state.ConnectionState;
 import org.apache.zookeeper.CreateMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import xdzk.curator.Paths;
 
 /**
  * Prototype for a container node that writes its attributes to an
