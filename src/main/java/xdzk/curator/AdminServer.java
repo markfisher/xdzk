@@ -239,7 +239,7 @@ public class AdminServer extends AbstractServer implements ContainerAware {
 	 * actual deployment of the stream is executed in the background.
 	 * <p>
 	 * Implementation consists of writing the stream deployment
-	 * request under the {@link xdzk.Path#STREAMS} znode.
+	 * request under the {@link xdzk.curator.Paths#STREAMS} znode.
 	 *
 	 * @param name        stream name
 	 * @param definition  stream definition (pipe delimited list of modules)

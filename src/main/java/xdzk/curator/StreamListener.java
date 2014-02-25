@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import xdzk.ContainerMatcher;
-import xdzk.Path;
 
 /**
  * Listener implementation that handles stream deployment requests.
@@ -94,7 +93,7 @@ class StreamListener implements PathChildrenCacheListener {
 	}
 
 	/**
-	 * Deploy a stream for the deployment request with the given stream name under {@link Path#STREAMS}.
+	 * Deploy a stream for the deployment request with the given stream name under {@link Paths#STREAMS}.
 	 *
 	 * @param client     curator client
 	 * @param streamName the name of the stream to deploy

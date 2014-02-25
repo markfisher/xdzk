@@ -24,8 +24,8 @@ import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import xdzk.AdminServerTest;
-import xdzk.Path;
+import xdzk.curator.AdminServerTest;
+import xdzk.curator.Paths;
 
 /**
  * @author Mark Fisher
@@ -45,7 +45,7 @@ public class StreamWriter {
 
 	private static void createStream(ZooKeeper client, String name, String definition) {
 		try {
-			client.create(Path.STREAMS.toString() + '/' + name, definition.getBytes("UTF-8"),
+			client.create(Paths.STREAMS + '/' + name, definition.getBytes("UTF-8"),
 					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 		}
 		catch (InterruptedException e) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package xdzk;
+package xdzk.curator;
 
 import java.util.Collection;
 import java.util.Collections;
