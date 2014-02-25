@@ -1,17 +1,24 @@
+/*
+ * Copyright 2014 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package xdzk;
 
-
-import com.oracle.tools.deferred.Eventually;
-import com.oracle.tools.runtime.console.SystemApplicationConsole;
-import com.oracle.tools.runtime.java.JavaApplication;
-import com.oracle.tools.runtime.java.NativeJavaApplicationBuilder;
-import com.oracle.tools.runtime.java.SimpleJavaApplication;
-import com.oracle.tools.runtime.java.SimpleJavaApplicationSchema;
-import com.oracle.tools.util.CompletionListener;
-
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static com.oracle.tools.deferred.DeferredHelper.eventually;
+import static com.oracle.tools.deferred.DeferredHelper.invoking;
+import static org.hamcrest.Matchers.is;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -23,9 +30,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.oracle.tools.deferred.DeferredHelper.eventually;
-import static com.oracle.tools.deferred.DeferredHelper.invoking;
-import static org.hamcrest.Matchers.is;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.oracle.tools.deferred.Eventually;
+import com.oracle.tools.runtime.console.SystemApplicationConsole;
+import com.oracle.tools.runtime.java.JavaApplication;
+import com.oracle.tools.runtime.java.NativeJavaApplicationBuilder;
+import com.oracle.tools.runtime.java.SimpleJavaApplication;
+import com.oracle.tools.runtime.java.SimpleJavaApplicationSchema;
+import com.oracle.tools.util.CompletionListener;
 
 /**
  * Test to assert the ability of {@link xdzk.AdminServer} to observe
@@ -48,7 +63,7 @@ public class AdminContainerObserverTest {
 	 *
 	 * @throws IOException
 	 */
-	protected JavaApplication<SimpleJavaApplication> launch(Class clz) throws IOException {
+	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz) throws IOException {
 		return launch(clz, null);
 	}
 
@@ -62,7 +77,7 @@ public class AdminContainerObserverTest {
 	 *
 	 * @throws IOException
 	 */
-	protected JavaApplication<SimpleJavaApplication> launch(Class clz, String[] args) throws IOException {
+	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz, String[] args) throws IOException {
 		String classpath = System.getProperty("java.class.path");
 		SimpleJavaApplicationSchema schema = new SimpleJavaApplicationSchema(clz.getName(), classpath);
 		if (args != null) {
