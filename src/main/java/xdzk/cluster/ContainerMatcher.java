@@ -16,7 +16,7 @@
 
 package xdzk.cluster;
 
-import java.util.Iterator;
+import xdzk.core.Module;
 
 
 /**
@@ -29,8 +29,9 @@ public interface ContainerMatcher {
 	/**
 	 * Matches the provided module against one of the candidate containers.
 	 *
-	 * @param moduleDeploymentRequest the module deployment request
-	 * @param candidates set of containers to which a module could be deployed
+	 *
+	 * @param module
+	 * @param containerRepository
 	 * @return the matched container, or <code>null</code> if no suitable match
 	 */
 	// TODO: The module name should be replaced with ModuleDeploymentRequest which will
@@ -38,6 +39,6 @@ public interface ContainerMatcher {
 	// metadata extracted from the stream deployment manifest, such as the number of instances.
 	// Also, the String return and collection element type should be Container instances
 	// where ultimately matching will take Container attributes and metrics into consideration.
-	Container match(String module, Iterator<Container> candidates);
+	Container match(Module module, ContainerRepository containerRepository);
 
 }

@@ -17,6 +17,9 @@
 package xdzk.server;
 
 import java.lang.management.ManagementFactory;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
@@ -25,8 +28,13 @@ import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.curator.framework.state.ConnectionState;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import xdzk.core.MapBytesUtility;
+import xdzk.core.Module;
+import xdzk.core.ModuleRepository;
+import xdzk.core.StubModuleRepository;
 import xdzk.curator.Paths;
 
 /**
@@ -55,6 +63,17 @@ public class ContainerServer extends AbstractServer {
 	private volatile PathChildrenCache deployments;
 
 	/**
+	 * Utility to convert maps to byte arrays.
+	 */
+	private final MapBytesUtility mapBytesUtility = new MapBytesUtility();
+
+	/**
+	 * Module repository.
+	 */
+	// TODO: make this pluggable
+	private final ModuleRepository moduleRepository = new StubModuleRepository();
+
+	/**
 	 * Server constructor.
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
@@ -76,22 +95,21 @@ public class ContainerServer extends AbstractServer {
 			Paths.ensurePath(client, Paths.DEPLOYMENTS);
 			Paths.ensurePath(client, Paths.CONTAINERS);
 
-			deployments = new PathChildrenCache(client, Paths.DEPLOYMENTS + "/" + this.getId(), false);
+			deployments = new PathChildrenCache(client, Paths.DEPLOYMENTS + "/" + this.getId(), true);
 			deployments.getListenable().addListener(deploymentListener);
 
 			String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
 			String tokens[] = mxBeanName.split("@");
-			StringBuilder builder = new StringBuilder()
-					.append("pid=").append(tokens[0])
-					.append(System.lineSeparator())
-					.append("host=").append(tokens[1]);
+			Map<String, String> map = new HashMap<String, String>();
+			map.put("pid", tokens[0]);
+			map.put("host", tokens[1]);
 
 			client.create().withMode(CreateMode.EPHEMERAL).forPath(
-					Paths.CONTAINERS + "/" + this.getId(), builder.toString().getBytes("UTF-8"));
+					Paths.CONTAINERS + "/" + this.getId(), mapBytesUtility.toByteArray(map));
 
 			deployments.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
 
-			LOG.info("Started container {} with attributes: {} ", this.getId(), builder);
+			LOG.info("Started container {} with attributes: {} ", this.getId(), map);
 		}
 		catch (Exception e) {
 			throw new RuntimeException(e);
@@ -116,21 +134,53 @@ public class ContainerServer extends AbstractServer {
 	}
 
 	/**
-	 * Handle a new deployment.
+	 * Event handler for new module deployments.
 	 *
-	 * @param deployment name of deployment
+	 * @param client  curator client
+	 * @param data    module data
 	 */
-	protected void onDeploymentAdded(String deployment) {
-		LOG.info("Deployment added: {}", deployment);
+	private void onDeploymentAdded(CuratorFramework client, ChildData data) {
+		Map<String, String> attributes = mapBytesUtility.toMap(data.getData());
+		String streamName = attributes.get("stream");
+		String moduleType = attributes.get("type");
+		String moduleName = Paths.stripPath(data.getPath());
+
+		LOG.info("Deploying module {} for stream {}", moduleName, streamName);
+
+		Module module = moduleRepository.loadModule(moduleName, Module.Type.valueOf(moduleType.toUpperCase()));
+
+		LOG.info("Loading module from {}", module.getUrl());
+
+		// todo: this is where we load the module
+
+		String path = Paths.createPath(Paths.STREAMS, streamName, moduleType, moduleName, getId());
+
+		try {
+			// this indicates that the container has deployed the module
+			client.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
+					.forPath(path, mapBytesUtility.toByteArray(Collections.singletonMap("state", "deployed")));
+		}
+		catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		catch (KeeperException.NodeExistsException e) {
+			// todo: review, this should not happen
+			LOG.info("Module for stream {} already deployed", moduleName, streamName);
+		}
+		catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	/**
-	 * Handle the removal of a deployment.
+	 * Event handler for deployment removals.
 	 *
-	 * @param deployment name of deployment
+	 * @param client  curator client
+	 * @param data    module data
 	 */
-	protected void onDeploymentRemoved(String deployment) {
-		LOG.info("Deployment removed: {}", deployment);
+	private void onChildRemoved(CuratorFramework client, ChildData data) {
+		// todo: implement
+		LOG.info("Deployment removed: {}", Paths.stripPath(data.getPath()));
 	}
 
 	class DeploymentListener implements PathChildrenCacheListener {
@@ -148,14 +198,14 @@ public class ContainerServer extends AbstractServer {
 					// For now just (wrongly) assume that everything
 					// should be deployed.
 					for (ChildData data : event.getInitialData()) {
-						onDeploymentAdded(Paths.stripPath(data.getPath()));
+						onDeploymentAdded(client, data);
 					}
 					break;
 				case CHILD_ADDED:
-					onDeploymentAdded(Paths.stripPath(event.getData().getPath()));
+					onDeploymentAdded(client, event.getData());
 					break;
 				case CHILD_REMOVED:
-					onDeploymentRemoved(Paths.stripPath(event.getData().getPath()));
+					onChildRemoved(client, event.getData());
 					break;
 				default:
 					break;

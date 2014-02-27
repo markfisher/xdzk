@@ -74,6 +74,39 @@ public class Paths {
 	}
 
 	/**
+	 * Return a string with the provided path elements separated
+	 * by a slash {@code /}.
+	 *
+	 * @param elements path elements
+	 *
+	 * @return the full path
+	 */
+	public static String createPath(String... elements) {
+		StringBuilder builder = new StringBuilder();
+		for (int i = 0; i < elements.length; i++) {
+			builder.append(elements[i]);
+			if (i + 1 < elements.length) {
+				builder.append('/');
+			}
+		}
+
+		return builder.toString();
+	}
+
+	/**
+	 * Return a string with the provided path elements separated
+	 * by a slash {@code /}. The {@link #XD_NAMESPACE} is included
+	 * as a prefix.
+	 *
+	 * @param elements path elements
+	 *
+	 * @return the full path
+	 */
+	public static String createPathWithNamespace(String... elements) {
+		return '/' + XD_NAMESPACE + '/' + createPath(elements);
+	}
+
+	/**
 	 * Ensure the existence of the given path.
 	 *
 	 * @param client  curator client
