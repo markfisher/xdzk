@@ -34,7 +34,7 @@ public class RandomContainerMatcher implements ContainerMatcher {
 	 */
 	@Override
 	public Container match(String module, Iterator<Container> candidates) {
-		List<Container> containers = new ArrayList<>();
+		List<Container> containers = new ArrayList<Container>();
 		while (candidates.hasNext()) {
 			containers.add(candidates.next());
 		}

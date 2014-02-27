@@ -142,7 +142,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	public Set<String> getContainerPaths() {
 		// todo: instead of returning a set here, perhaps
 		// we can return Iterator<String>
-		Set<String> containerSet = new HashSet<>();
+		Set<String> containerSet = new HashSet<String>();
 		for (ChildData child : containers.getCurrentData()) {
 			containerSet.add(child.getPath());
 		}
@@ -157,7 +157,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	public Set<String> getStreamPaths() {
 		// todo: instead of returning a set here, perhaps
 		// we can return Iterator<String>
-		Set<String> streamSet = new HashSet<>();
+		Set<String> streamSet = new HashSet<String>();
 		for (ChildData child : streams.getCurrentData()) {
 			streamSet.add(child.getPath());
 		}
@@ -276,7 +276,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			// iterator returned by getContainerIterator. While elegant,
 			// this isn't exactly efficient. TODO - revisit
 			try {
-				Map<String, String> attributes = new HashMap<>();
+				Map<String, String> attributes = new HashMap<String, String>();
 				byte[] data = source.getData();
 
 				if (data != null) {
