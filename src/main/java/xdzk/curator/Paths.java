@@ -31,7 +31,7 @@ public class Paths {
 	/**
 	 * Map of paths to {@link org.apache.curator.utils.EnsurePath} instances.
 	 */
-	private static final ConcurrentMap<String, EnsurePath> ensurePaths = new ConcurrentHashMap<>();
+	private static final ConcurrentMap<String, EnsurePath> ensurePaths = new ConcurrentHashMap<String, EnsurePath>();
 
 	/**
 	 * Namespace path (i.e. the top node in the hierarchy)
@@ -71,6 +71,39 @@ public class Paths {
 	public static String stripPath(String path) {
 		// todo: error handling
 		return path.substring(path.lastIndexOf('/') + 1);
+	}
+
+	/**
+	 * Return a string with the provided path elements separated
+	 * by a slash {@code /}.
+	 *
+	 * @param elements path elements
+	 *
+	 * @return the full path
+	 */
+	public static String createPath(String... elements) {
+		StringBuilder builder = new StringBuilder();
+		for (int i = 0; i < elements.length; i++) {
+			builder.append(elements[i]);
+			if (i + 1 < elements.length) {
+				builder.append('/');
+			}
+		}
+
+		return builder.toString();
+	}
+
+	/**
+	 * Return a string with the provided path elements separated
+	 * by a slash {@code /}. The {@link #XD_NAMESPACE} is included
+	 * as a prefix.
+	 *
+	 * @param elements path elements
+	 *
+	 * @return the full path
+	 */
+	public static String createPathWithNamespace(String... elements) {
+		return '/' + XD_NAMESPACE + '/' + createPath(elements);
 	}
 
 	/**

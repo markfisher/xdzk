@@ -16,17 +16,11 @@
 
 package xdzk.server;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -47,9 +41,12 @@ import org.springframework.core.convert.converter.Converter;
 import xdzk.cluster.ContainerMatcher;
 import xdzk.cluster.ContainerRepository;
 import xdzk.cluster.RandomContainerMatcher;
-import xdzk.curator.ChildPathIterator;
 import xdzk.cluster.Container;
+import xdzk.core.ModuleRepository;
+import xdzk.core.StubModuleRepository;
 import xdzk.curator.Paths;
+import xdzk.curator.ChildPathIterator;
+import xdzk.core.MapBytesUtility;
 
 /**
  * Prototype implementation of an XD admin server that watches ZooKeeper
@@ -124,6 +121,17 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 */
 	private final ContainerConverter containerConverter = new ContainerConverter();
 
+	/**
+	 * Utility to convert maps to byte arrays.
+	 */
+	private final MapBytesUtility mapBytesUtility = new MapBytesUtility();
+
+	/**
+	 * Module repository.
+	 */
+	// TODO: make this pluggable
+	private final ModuleRepository moduleRepository = new StubModuleRepository();
+
 
 	/**
 	 * Server constructor.
@@ -142,7 +150,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	public Set<String> getContainerPaths() {
 		// todo: instead of returning a set here, perhaps
 		// we can return Iterator<String>
-		Set<String> containerSet = new HashSet<>();
+		Set<String> containerSet = new HashSet<String>();
 		for (ChildData child : containers.getCurrentData()) {
 			containerSet.add(child.getPath());
 		}
@@ -157,7 +165,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	public Set<String> getStreamPaths() {
 		// todo: instead of returning a set here, perhaps
 		// we can return Iterator<String>
-		Set<String> streamSet = new HashSet<>();
+		Set<String> streamSet = new HashSet<String>();
 		for (ChildData child : streams.getCurrentData()) {
 			streamSet.add(child.getPath());
 		}
@@ -204,8 +212,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			containers.getListenable().addListener(containerListener);
 			containers.start();
 
-			// todo: LeaderSelector does not make use of namespaces :(
-			leaderSelector = new LeaderSelector(client, '/' + Paths.XD_NAMESPACE + '/' + Paths.ADMIN, leaderListener);
+			leaderSelector = new LeaderSelector(client, Paths.createPathWithNamespace(Paths.ADMIN), leaderListener);
 			leaderSelector.setId(getId());
 			leaderSelector.start();
 		}
@@ -257,7 +264,8 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			throw new IllegalArgumentException("definition must not be null");
 		}
 		try {
-			getClient().create().forPath(Paths.STREAMS + '/' + name, definition.getBytes("UTF-8"));
+			getClient().create().forPath(Paths.createPath(Paths.STREAMS, name),
+					mapBytesUtility.toByteArray(Collections.singletonMap("definition", definition)));
 		}
 		catch (Exception e) {
 			throw new RuntimeException(e);
@@ -268,35 +276,14 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 * Converts a {@link org.apache.curator.framework.recipes.cache.ChildData} node
 	 * to a {@link xdzk.cluster.Container}.
 	 */
-	public static class ContainerConverter implements Converter<ChildData, Container> {
+	public class ContainerConverter implements Converter<ChildData, Container> {
 
 		@Override
 		public Container convert(ChildData source) {
 			// This converter will be invoked upon every iteration of the
 			// iterator returned by getContainerIterator. While elegant,
 			// this isn't exactly efficient. TODO - revisit
-			try {
-				Map<String, String> attributes = new HashMap<>();
-				byte[] data = source.getData();
-
-				if (data != null) {
-					BufferedReader reader = new BufferedReader(new InputStreamReader(
-							new ByteArrayInputStream(source.getData())));
-
-					String line;
-					while ((line = reader.readLine()) != null) {
-						if (!line.startsWith("#") && !line.isEmpty()) {
-							String[] pair = line.trim().split("=");
-							attributes.put(pair[0].trim(), pair[1].trim());
-						}
-					}
-				}
-
-				return new Container(source.getPath(), attributes);
-			}
-			catch (IOException e) {
-				throw new RuntimeException(e);
-			}
+			return new Container(Paths.stripPath(source.getPath()), mapBytesUtility.toMap(source.getData()));
 		}
 	}
 
@@ -337,10 +324,11 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		@Override
 		public void takeLeadership(CuratorFramework client) throws Exception {
 			LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
-			PathChildrenCacheListener streamListener = new StreamListener(AdminServer.this, containerMatcher);
+			PathChildrenCacheListener streamListener =
+					new StreamListener(AdminServer.this, containerMatcher, moduleRepository);
 
 			try {
-				streams = new PathChildrenCache(client, Paths.STREAMS, false);
+				streams = new PathChildrenCache(client, Paths.STREAMS, true);
 				streams.getListenable().addListener(streamListener);
 				streams.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
 

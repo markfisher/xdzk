@@ -95,7 +95,7 @@ public class AdminContainerObserverTest {
 			}
 		}
 		NativeJavaApplicationBuilder<SimpleJavaApplication, SimpleJavaApplicationSchema> builder =
-				new NativeJavaApplicationBuilder<>();
+				new NativeJavaApplicationBuilder<SimpleJavaApplication, SimpleJavaApplicationSchema>();
 		return builder.realize(schema, clz.getName(), new SystemApplicationConsole());
 	}
 
@@ -111,7 +111,7 @@ public class AdminContainerObserverTest {
 	public Set<String> getCurrentContainers(JavaApplication<SimpleJavaApplication> adminServer) throws Exception {
 		final Set<String> containers = Collections.synchronizedSet(new HashSet<String>());
 		final CountDownLatch latch = new CountDownLatch(1);
-		final AtomicReference<Exception> exception = new AtomicReference<>();
+		final AtomicReference<Exception> exception = new AtomicReference<Exception>();
 
 		adminServer.submit(new AdminServer.CurrentContainers(), new CompletionListener<Collection<String>>() {
 			@Override
