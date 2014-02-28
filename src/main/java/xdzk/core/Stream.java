@@ -310,8 +310,10 @@ public class Stream {
 					break;
 				case PROCESSOR:
 					processors.add(module);
+					break;
 				case SINK:
 					sink = module;
+					break;
 			}
 
 			return this;
