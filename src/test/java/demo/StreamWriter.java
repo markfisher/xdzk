@@ -24,7 +24,10 @@ import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import xdzk.core.MapBytesUtility;
 import xdzk.curator.Paths;
+
+import java.util.Collections;
 
 /**
  * @author Mark Fisher
@@ -44,7 +47,10 @@ public class StreamWriter {
 
 	private static void createStream(ZooKeeper client, String name, String definition) {
 		try {
-			client.create(Paths.STREAMS + '/' + name, definition.getBytes("UTF-8"),
+			MapBytesUtility utility = new MapBytesUtility();
+
+			client.create(Paths.createPathWithNamespace(Paths.STREAMS, name),
+					utility.toByteArray(Collections.singletonMap("definition", definition)),
 					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 		}
 		catch (InterruptedException e) {
