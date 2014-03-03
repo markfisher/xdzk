@@ -139,7 +139,7 @@ public class ContainerServer extends AbstractServer {
 	 * @param client  curator client
 	 * @param data    module data
 	 */
-	private void onDeploymentAdded(CuratorFramework client, ChildData data) {
+	private void onChildAdded(CuratorFramework client, ChildData data) {
 		Map<String, String> attributes = mapBytesUtility.toMap(data.getData());
 		String streamName = attributes.get("stream");
 		String moduleType = attributes.get("type");
@@ -198,11 +198,11 @@ public class ContainerServer extends AbstractServer {
 					// For now just (wrongly) assume that everything
 					// should be deployed.
 					for (ChildData data : event.getInitialData()) {
-						onDeploymentAdded(client, data);
+						onChildAdded(client, data);
 					}
 					break;
 				case CHILD_ADDED:
-					onDeploymentAdded(client, event.getData());
+					onChildAdded(client, event.getData());
 					break;
 				case CHILD_REMOVED:
 					onChildRemoved(client, event.getData());

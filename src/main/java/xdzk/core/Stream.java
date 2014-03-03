@@ -16,6 +16,8 @@
 
 package xdzk.core;
 
+import org.springframework.util.Assert;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -45,7 +47,7 @@ public class Stream {
 
 	/**
 	 * Ordered list of processor modules. The data obtained by
-	 * the sink module will be fed to these processors in the order
+	 * the source module will be fed to these processors in the order
 	 * indicated by this list.
 	 */
 	private final List<Module> processors;
@@ -74,7 +76,7 @@ public class Stream {
 				Module sink, Map<String, String> properties) {
 		this.name = name;
 		this.source = source;
-		this.processors = new LinkedList<Module>(processors);
+		this.processors = new LinkedList<Module>(processors == null ? Collections.<Module>emptyList() : processors);
 		this.sink = sink;
 		this.properties = properties;
 	}
@@ -196,7 +198,7 @@ public class Stream {
 		 */
 		@SuppressWarnings("unchecked")
 		DeploymentOrderIterator() {
-			assert processors instanceof Deque;
+			Assert.isInstanceOf(Deque.class, processors);
 			processorIterator = ((Deque) processors).descendingIterator();
 			state = IteratorState.INITIAL;
 		}
@@ -274,15 +276,6 @@ public class Stream {
 		private Map<String, String> properties;
 
 		/**
-		 * Return the stream name.
-		 *
-		 * @return stream name
-		 */
-		public String getName() {
-			return name;
-		}
-
-		/**
 		 * Set the stream name.
 		 *
 		 * @param name stream name
@@ -317,15 +310,6 @@ public class Stream {
 			}
 
 			return this;
-		}
-
-		/**
-		 * Return the properties for the stream.
-		 *
-		 * @return stream properties
-		 */
-		public Map<String, String> getProperties() {
-			return properties;
 		}
 
 		/**
