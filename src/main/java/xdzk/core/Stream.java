@@ -17,6 +17,8 @@
 package xdzk.core;
 
 import org.springframework.util.Assert;
+import xdzk.cluster.ContainerMatcher;
+import xdzk.cluster.DeploymentManifestMatcher;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,20 +45,27 @@ public class Stream {
 	 * Source module for this stream. This module is responsible for
 	 * obtaining data for this stream.
 	 */
-	private final Module source;
+	private final ModuleDescriptor source;
 
 	/**
 	 * Ordered list of processor modules. The data obtained by
 	 * the source module will be fed to these processors in the order
 	 * indicated by this list.
 	 */
-	private final List<Module> processors;
+	private final List<ModuleDescriptor> processors;
 
 	/**
 	 * Sink module for this stream. This is the ultimate destination
 	 * for the stream data.
 	 */
-	private final Module sink;
+	private final ModuleDescriptor sink;
+
+	/**
+	 * Container matcher for this stream. This is used by the stream
+	 * to indicate which container(s) should deploy the various
+	 * modules in the stream.
+	 */
+	private final ContainerMatcher containerMatcher;
 
 	/**
 	 * Properties for this stream.
@@ -72,14 +81,19 @@ public class Stream {
 	 * @param sink        sink module
 	 * @param properties  stream properties
 	 */
-	private Stream(String name, Module source, List<Module> processors,
-				Module sink, Map<String, String> properties) {
+	private Stream(String name, ModuleDescriptor source, List<ModuleDescriptor> processors,
+				ModuleDescriptor sink, ContainerMatcher containerMatcher, Map<String, String> properties) {
 		this.name = name;
 		this.source = source;
-		this.processors = new LinkedList<Module>(processors == null ? Collections.<Module>emptyList() : processors);
+		this.processors = new LinkedList<ModuleDescriptor>(processors == null
+				? Collections.<ModuleDescriptor>emptyList()
+				: processors);
 		this.sink = sink;
+		this.containerMatcher = containerMatcher;
 		this.properties = properties;
 	}
+
+
 
 	/**
 	 * Return the name of this stream.
@@ -95,7 +109,7 @@ public class Stream {
 	 *
 	 * @return source module
 	 */
-	public Module getSource() {
+	public ModuleDescriptor getSource() {
 		return source;
 	}
 
@@ -104,7 +118,7 @@ public class Stream {
 	 *
 	 * @return list of processors
 	 */
-	public List<Module> getProcessors() {
+	public List<ModuleDescriptor> getProcessors() {
 		return Collections.unmodifiableList(processors);
 	}
 
@@ -113,8 +127,17 @@ public class Stream {
 	 *
 	 * @return sink module
 	 */
-	public Module getSink() {
+	public ModuleDescriptor getSink() {
 		return sink;
+	}
+
+	/**
+	 * Return the container matcher for this stream.
+	 *
+	 * @return container matcher
+	 */
+	public ContainerMatcher getContainerMatcher() {
+		return containerMatcher;
 	}
 
 	/**
@@ -125,7 +148,7 @@ public class Stream {
 	 *
 	 * @return iterator that iterates over the modules in deployment order
 	 */
-	public Iterator<Module> getDeploymentOrderIterator() {
+	public Iterator<ModuleDescriptor> getDeploymentOrderIterator() {
 		return new DeploymentOrderIterator();
 	}
 
@@ -148,7 +171,6 @@ public class Stream {
 				", source=" + source +
 				", processors=" + processors +
 				", sink=" + sink +
-				", properties=" + properties +
 				'}';
 	}
 
@@ -182,7 +204,7 @@ public class Stream {
 	 * first, followed by processor modules in reverse order,
 	 * followed by the source module.
 	 */
-	class DeploymentOrderIterator implements Iterator<Module> {
+	class DeploymentOrderIterator implements Iterator<ModuleDescriptor> {
 		/**
 		 * Iterator state.
 		 */
@@ -191,7 +213,7 @@ public class Stream {
 		/**
 		 * Iterator over the processor modules.
 		 */
-		private final Iterator<Module> processorIterator;
+		private final Iterator<ModuleDescriptor> processorIterator;
 
 		/**
 		 * Construct a DeploymentOrderIterator.
@@ -215,7 +237,7 @@ public class Stream {
 		 * {@inheritDoc}
 		 */
 		@Override
-		public Module next() {
+		public ModuleDescriptor next() {
 			switch(state) {
 				case INITIAL:
 					state = IteratorState.PROC_ITERATOR_ACTIVE;
@@ -271,9 +293,14 @@ public class Stream {
 		private Module sink;
 
 		/**
+		 * Container matcher. Defaults to {@link DeploymentManifestMatcher}.
+		 */
+		private ContainerMatcher containerMatcher = new DeploymentManifestMatcher();
+
+		/**
 		 * Stream properties
 		 */
-		private Map<String, String> properties;
+		private Map<String, String> properties = Collections.emptyMap();
 
 		/**
 		 * Set the stream name.
@@ -330,7 +357,39 @@ public class Stream {
 		 * @return new Stream instance
 		 */
 		public Stream build() {
-			return new Stream(name, source, processors, sink, properties);
+			ModuleDescriptor sourceDescriptor = new ModuleDescriptor(source, name, -1,
+					properties.get(String.format("module.%s.group", source.getName())),
+					convert(properties.get(String.format("module.%s.count", source.getName()))));
+
+			List<ModuleDescriptor> processorDescriptors = new ArrayList<ModuleDescriptor>();
+			int i = 0;
+			for (Module module : processors) {
+				processorDescriptors.add(new ModuleDescriptor(module, name, i++,
+						properties.get(String.format("module.%s.group", module.getName())),
+						convert(properties.get(String.format("module.%s.count", module.getName())))));
+			}
+
+			ModuleDescriptor sinkDescriptor = new ModuleDescriptor(sink, name, -1,
+					properties.get(String.format("module.%s.group", sink.getName())),
+					convert(properties.get(String.format("module.%s.count", sink.getName()))));
+
+			// TODO: if the manifest includes a container matcher, an instance should
+			// be obtained and passed along to the constructor. Perhaps this can
+			// be loaded from an application context?
+			//String matcher = properties.get("matcher");
+
+			return new Stream(name, sourceDescriptor, processorDescriptors, sinkDescriptor, containerMatcher, properties);
+		}
+
+		/**
+		 * Convert a String value to an int. Returns 1 if the String is null.
+		 *
+		 * @param s string to convert
+		 *
+		 * @return int value of String, or 1 if null
+		 */
+		private int convert(String s) {
+			return s == null ? 1 : Integer.valueOf(s);
 		}
 	}
 

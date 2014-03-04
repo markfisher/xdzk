@@ -34,13 +34,13 @@ public class StreamTest {
 		Stream stream = streamFactory.createStream("ticktock", "time | log", null);
 
 		assertEquals("ticktock", stream.getName());
-		Iterator<Module> iterator = stream.getDeploymentOrderIterator();
+		Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator();
 		assertTrue(iterator.hasNext());
 
 		String[] moduleNames = {"log", "time"};
 		for (String moduleName : moduleNames) {
-			Module module = iterator.next();
-			assertEquals(moduleName, module.getName());
+			ModuleDescriptor module = iterator.next();
+			assertEquals(moduleName, module.getModule().getName());
 		}
 
 		assertFalse(iterator.hasNext());
@@ -62,13 +62,13 @@ public class StreamTest {
 		Stream stream = streamFactory.createStream("fancy-http", "http | transform | filter | log", null);
 
 		assertEquals("fancy-http", stream.getName());
-		Iterator<Module> iterator = stream.getDeploymentOrderIterator();
+		Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator();
 		assertTrue(iterator.hasNext());
 
 		String[] moduleNames = {"log", "filter", "transform", "http"};
 		for (String moduleName : moduleNames) {
-			Module module = iterator.next();
-			assertEquals(moduleName, module.getName());
+			ModuleDescriptor module = iterator.next();
+			assertEquals(moduleName, module.getModule().getName());
 		}
 
 		assertFalse(iterator.hasNext());

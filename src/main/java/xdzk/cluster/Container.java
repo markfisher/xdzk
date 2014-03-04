@@ -16,6 +16,8 @@
 
 package xdzk.cluster;
 
+import org.springframework.util.Assert;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,6 +46,7 @@ public class Container {
 	 * @param attributes  container attributes
 	 */
 	public Container(String name, Map<String, String> attributes) {
+		Assert.hasText(name);
 		this.name = name;
 		this.attributes = Collections.unmodifiableMap(new HashMap<String, String>(attributes));
 	}
@@ -64,6 +67,22 @@ public class Container {
 	 */
 	public Map<String, String> getAttributes() {
 		return attributes;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean equals(Object o) {
+		return o instanceof Container && name.equals(((Container) o).getName());
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public int hashCode() {
+		return name.hashCode();
 	}
 
 	/**

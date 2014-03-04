@@ -140,10 +140,11 @@ public class ContainerServer extends AbstractServer {
 	 * @param data    module data
 	 */
 	private void onChildAdded(CuratorFramework client, ChildData data) {
-		Map<String, String> attributes = mapBytesUtility.toMap(data.getData());
-		String streamName = attributes.get("stream");
-		String moduleType = attributes.get("type");
-		String moduleName = Paths.stripPath(data.getPath());
+		String deploymentPath = Paths.stripPath(data.getPath());
+		String[] split = deploymentPath.split("\\.");
+		String streamName = split[0];
+		String moduleType = split[1];
+		String moduleName = split[2];
 
 		LOG.info("Deploying module {} for stream {}", moduleName, streamName);
 
@@ -153,12 +154,12 @@ public class ContainerServer extends AbstractServer {
 
 		// todo: this is where we load the module
 
-		String path = Paths.createPath(Paths.STREAMS, streamName, moduleType, moduleName, getId());
+		String streamPath = Paths.createPath(Paths.STREAMS, streamName, moduleType, moduleName, getId());
 
 		try {
 			// this indicates that the container has deployed the module
 			client.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
-					.forPath(path, mapBytesUtility.toByteArray(Collections.singletonMap("state", "deployed")));
+					.forPath(streamPath, mapBytesUtility.toByteArray(Collections.singletonMap("state", "deployed")));
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();

@@ -35,9 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.core.convert.converter.Converter;
 
-import xdzk.cluster.ContainerMatcher;
 import xdzk.cluster.ContainerRepository;
-import xdzk.cluster.RandomContainerMatcher;
 import xdzk.cluster.Container;
 import xdzk.core.ModuleRepository;
 import xdzk.curator.Paths;
@@ -99,12 +97,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 * Listener that is invoked when this admin server is elected leader.
 	 */
 	private final LeaderSelectorListener leaderListener = new LeaderListener();
-
-	/**
-	 * Container matcher used to match containers to module deployments.
-	 */
-	// TODO: make this pluggable
-	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
 
 	/**
 	 * Converter from {@link ChildData} types to {@link xdzk.cluster.Container}.
@@ -173,16 +165,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	@Override
 	public Iterator<Container> getContainerIterator() {
 		return new ChildPathIterator<Container>(containerConverter, containers);
-	}
-
-	/**
-	 * Return the configured {@link xdzk.cluster.ContainerMatcher}. This matcher
-	 * is used to match a container to a module deployment request.
-	 *
-	 * @return container matcher for this admin server
-	 */
-	public ContainerMatcher getContainerMatcher() {
-		return containerMatcher;
 	}
 
 	/**
@@ -320,7 +302,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		public void takeLeadership(CuratorFramework client) throws Exception {
 			LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
 			PathChildrenCacheListener streamListener =
-					new StreamListener(AdminServer.this, containerMatcher, moduleRepository);
+					new StreamListener(AdminServer.this, moduleRepository);
 
 			try {
 				streams = new PathChildrenCache(client, Paths.STREAMS, true);

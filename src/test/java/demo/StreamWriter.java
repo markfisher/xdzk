@@ -28,6 +28,8 @@ import xdzk.core.MapBytesUtility;
 import xdzk.curator.Paths;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Mark Fisher
@@ -38,19 +40,28 @@ public class StreamWriter {
 
 	public static void main(String[] args) throws Exception {
 		ZooKeeper zk = new ZooKeeper("localhost:2181", 15000, new ZkWatcher());
-		createStream(zk, "time2log", "time | log");
+		createStream(zk, "time2log", "time | log", null);
 		Thread.sleep(3000);
-		createStream(zk, "foo2bar", "foo | bar");
-		Thread.sleep(3000);
-		createStream(zk, "tcp2hdfs", "tcp | hdfs");
+
+		// stream with deployment manifest
+		Map<String, String> attributes = new HashMap<String, String>();
+		attributes.put("module.http.group", "all");
+		attributes.put("module.file.group", "all");
+		createStream(zk, "everywhere", "http | file", attributes);
 	}
 
-	private static void createStream(ZooKeeper client, String name, String definition) {
+	private static void createStream(ZooKeeper client, String name, String definition, Map<String, String> attributes) {
 		try {
 			MapBytesUtility utility = new MapBytesUtility();
+			if (attributes == null) {
+				attributes = Collections.singletonMap("definition", definition);
+			}
+			else {
+				attributes.put("definition", definition);
+			}
 
 			client.create(Paths.createPathWithNamespace(Paths.STREAMS, name),
-					utility.toByteArray(Collections.singletonMap("definition", definition)),
+					utility.toByteArray(attributes),
 					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 		}
 		catch (InterruptedException e) {

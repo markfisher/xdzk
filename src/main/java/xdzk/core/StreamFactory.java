@@ -16,6 +16,8 @@
 
 package xdzk.core;
 
+import org.springframework.util.Assert;
+
 import java.util.Map;
 
 /**
@@ -32,8 +34,11 @@ public class StreamFactory {
 		String[] modules = dsl.split("\\|");
 
 		Stream.Builder builder = new Stream.Builder();
+		Assert.hasText(name);
 		builder.setName(name);
-		builder.setProperties(properties);
+		if (properties != null) {
+			builder.setProperties(properties);
+		}
 
 		for (int i = 0; i < modules.length; i++) {
 			Module module = moduleRepository.loadModule(modules[i].trim(),

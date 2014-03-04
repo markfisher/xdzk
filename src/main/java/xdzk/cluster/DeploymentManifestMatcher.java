@@ -20,23 +20,27 @@ import xdzk.core.ModuleDescriptor;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 
 /**
- * Implementation of the {@link ContainerMatcher} strategy that selects any one of the candidate containers at random.
+ * Implementation of {@link ContainerMatcher} that returns a collection of
+ * containers to deploy a {@link ModuleDescriptor} to. If the manifest specifies
+ * a group of "all" for a module, all available containers are returned.
+ * Otherwise a collection of at least one {@link Container} is returned
+ * for module deployment. An attempt at round robin distribution will be
+ * made (but not guaranteed).
  *
- * @author Mark Fisher
+ * @author Patrick Peralta
  */
-public class RandomContainerMatcher implements ContainerMatcher {
-	private static final Random RANDOM = new Random();
+public class DeploymentManifestMatcher implements ContainerMatcher {
+	/**
+	 * Current index for iterating over containers.
+	 */
+	private int index = 0;
 
 	/**
 	 * {@inheritDoc}
-	 * <p/>
-	 * Randomly selects one of the candidate containers.
 	 */
 	@Override
 	public Collection<Container> match(ModuleDescriptor moduleDescriptor, ContainerRepository containerRepository) {
@@ -45,9 +49,22 @@ public class RandomContainerMatcher implements ContainerMatcher {
 		while (iterator.hasNext()) {
 			containers.add(iterator.next());
 		}
-		return containers.isEmpty()
-				? Collections.<Container>emptySet()
-				: Collections.singleton(containers.get(RANDOM.nextInt(containers.size())));
+
+		if ("all".equals(moduleDescriptor.getGroup())) {
+			return containers;
+		}
+		else {
+			// todo: needs unit testing
+			List<Container> targets = new ArrayList<Container>();
+			while (targets.size() < moduleDescriptor.getCount()) {
+				if (index + 1 > containers.size()) {
+					index = 0;
+				}
+				targets.add(containers.get(index++));
+			}
+
+			return targets;
+		}
 	}
 
 }
