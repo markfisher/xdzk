@@ -3,7 +3,6 @@ buildscript {
 		springBootVersion = '1.0.0.BUILD-SNAPSHOT'
 	}
 	repositories {
-		mavenLocal()
 		maven { url "http://repo.spring.io/libs-snapshot" }
 		maven { url "http://repo.spring.io/snapshot" }
 		maven { url "http://repo.spring.io/milestone" }

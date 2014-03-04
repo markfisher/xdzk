@@ -43,8 +43,9 @@ import com.oracle.tools.runtime.java.NativeJavaApplicationBuilder;
 import com.oracle.tools.runtime.java.SimpleJavaApplication;
 import com.oracle.tools.runtime.java.SimpleJavaApplicationSchema;
 import com.oracle.tools.util.CompletionListener;
+import xdzk.server.AdminApplication;
 import xdzk.server.AdminServer;
-import xdzk.server.ContainerServer;
+import xdzk.server.ContainerApplication;
 
 /**
  * Test to assert the ability of {@link xdzk.server.AdminServer} to observe
@@ -67,26 +68,13 @@ public class AdminContainerObserverTest {
 	 * Launch the given class's {@code main} method in a separate JVM.
 	 *
 	 * @param clz class to launch
-	 *
-	 * @return launched application
-	 *
-	 * @throws IOException
-	 */
-	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz) throws IOException {
-		return launch(clz, (String[]) null);
-	}
-
-	/**
-	 * Launch the given class's {@code main} method in a separate JVM.
-	 *
-	 * @param clz class to launch
 	 * @param args command line arguments
 	 *
 	 * @return launched application
 	 *
 	 * @throws IOException
 	 */
-	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz, String... args) throws IOException {
+	protected JavaApplication<SimpleJavaApplication> launch(Class<?> clz, boolean remoteDebug, String... args) throws IOException {
 		String classpath = System.getProperty("java.class.path");
 		SimpleJavaApplicationSchema schema = new SimpleJavaApplicationSchema(clz.getName(), classpath);
 		if (args != null) {
@@ -96,6 +84,7 @@ public class AdminContainerObserverTest {
 		}
 		NativeJavaApplicationBuilder<SimpleJavaApplication, SimpleJavaApplicationSchema> builder =
 				new NativeJavaApplicationBuilder<SimpleJavaApplication, SimpleJavaApplicationSchema>();
+		builder.setRemoteDebuggingEnabled(remoteDebug);
 		return builder.realize(schema, clz.getName(), new SystemApplicationConsole());
 	}
 
@@ -113,7 +102,7 @@ public class AdminContainerObserverTest {
 		final CountDownLatch latch = new CountDownLatch(1);
 		final AtomicReference<Exception> exception = new AtomicReference<Exception>();
 
-		adminServer.submit(new AdminServer.CurrentContainers(), new CompletionListener<Collection<String>>() {
+		adminServer.submit(new AdminApplication.CurrentContainers(), new CompletionListener<Collection<String>>() {
 			@Override
 			public void onCompletion(Collection<String> result) {
 				containers.addAll(result);
@@ -168,13 +157,19 @@ public class AdminContainerObserverTest {
 
 		try {
 			String zkAddress = "localhost:" + PORT;
-			adminServer = launch(AdminServer.class, zkAddress);
-			container1 = launch(ContainerServer.class, zkAddress);
-			container2 = launch(ContainerServer.class, zkAddress);
-			container3 = launch(ContainerServer.class, zkAddress);
+			// The Admin server is set up with remote debugging enabled.
+			// By default it will be port 30001, but this port can be
+			// obtained via the log file output. For this to be useful,
+			// a break point should be set in here to pause execution of
+			// the test while another debug session is launched to attach
+			// to the admin server.
+			adminServer = launch(AdminApplication.class, true, zkAddress);
+			container1 = launch(ContainerApplication.class, false, zkAddress);
+			container2 = launch(ContainerApplication.class, false, zkAddress);
+			container3 = launch(ContainerApplication.class, false, zkAddress);
 
 			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(3),
-					60, TimeUnit.SECONDS);
+					90, TimeUnit.SECONDS);
 
 			container3.close();
 			container3 = null;

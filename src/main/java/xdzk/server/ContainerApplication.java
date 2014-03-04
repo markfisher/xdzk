@@ -21,8 +21,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import xdzk.cluster.ContainerMatcher;
-import xdzk.cluster.RandomContainerMatcher;
 import xdzk.core.MapBytesUtility;
 import xdzk.core.ModuleRepository;
 import xdzk.core.StubModuleRepository;
@@ -48,16 +46,6 @@ public class ContainerApplication {
 	@Bean
 	public MapBytesUtility mapBytesUtility() {
 		return new MapBytesUtility();
-	}
-
-	/**
-	 * Bean definition for singleton instance of {@link ContainerMatcher}.
-	 *
-	 * @return new instance of ContainerMatcher
-	 */
-	@Bean
-	public ContainerMatcher containerMatcher() {
-		return new RandomContainerMatcher();
 	}
 
 	/**
