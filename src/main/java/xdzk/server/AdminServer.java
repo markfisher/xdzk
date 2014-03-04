@@ -16,13 +16,10 @@
 
 package xdzk.server;
 
-import java.io.Serializable;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.concurrent.Callable;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
@@ -43,7 +40,6 @@ import xdzk.cluster.ContainerRepository;
 import xdzk.cluster.RandomContainerMatcher;
 import xdzk.cluster.Container;
 import xdzk.core.ModuleRepository;
-import xdzk.core.StubModuleRepository;
 import xdzk.curator.Paths;
 import xdzk.curator.ChildPathIterator;
 import xdzk.core.MapBytesUtility;
@@ -65,12 +61,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 * Logger.
 	 */
 	private static final Logger LOG = LoggerFactory.getLogger(AbstractServer.class);
-
-	/**
-	 * Singleton instance of the Admin server. Marked volatile because this reference
-	 * is updated by the main thread and is read by the {@link CurrentContainers} callable.
-	 */
-	public static volatile AdminServer INSTANCE;
 
 	/**
 	 * Cache of children under the containers path. This path is used to track
@@ -124,13 +114,12 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	/**
 	 * Utility to convert maps to byte arrays.
 	 */
-	private final MapBytesUtility mapBytesUtility = new MapBytesUtility();
+	private final MapBytesUtility mapBytesUtility;
 
 	/**
 	 * Module repository.
 	 */
-	// TODO: make this pluggable
-	private final ModuleRepository moduleRepository = new StubModuleRepository();
+	private final ModuleRepository moduleRepository;
 
 
 	/**
@@ -138,8 +127,10 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
 	 */
-	public AdminServer(String hostPort) {
+	public AdminServer(String hostPort, MapBytesUtility mapBytesUtility, ModuleRepository moduleRepository) {
 		super(hostPort);
+		this.mapBytesUtility = mapBytesUtility;
+		this.moduleRepository = moduleRepository;
 	}
 
 	/**
@@ -151,8 +142,10 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		// todo: instead of returning a set here, perhaps
 		// we can return Iterator<String>
 		Set<String> containerSet = new HashSet<String>();
-		for (ChildData child : containers.getCurrentData()) {
-			containerSet.add(child.getPath());
+		if (containers != null) {
+			for (ChildData child : containers.getCurrentData()) {
+				containerSet.add(child.getPath());
+			}
 		}
 		return Collections.unmodifiableSet(containerSet);
 	}
@@ -166,8 +159,10 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		// todo: instead of returning a set here, perhaps
 		// we can return Iterator<String>
 		Set<String> streamSet = new HashSet<String>();
-		for (ChildData child : streams.getCurrentData()) {
-			streamSet.add(child.getPath());
+		if (streams != null) {
+			for (ChildData child : streams.getCurrentData()) {
+				streamSet.add(child.getPath());
+			}
 		}
 		return Collections.unmodifiableSet(streamSet);
 	}
@@ -343,66 +338,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 				streams.close();
 			}
 		}
-	}
-
-	/**
-	 * Callable implementation that returns the known container paths.
-	 */
-	public static class CurrentContainers implements Callable<Collection<String>>, Serializable {
-		private static final long serialVersionUID = 0L;
-
-		@Override
-		public Collection<String> call() throws Exception {
-			return INSTANCE.getContainerPaths();
-		}
-	}
-
-	/**
-	 * Callable implementation that requests a stream deployment.
-	 */
-	public static class StreamDeploymentRequest implements Callable<Void>, Serializable {
-		private static final long serialVersionUID = 0L;
-
-		/**
-		 * Stream name.
-		 */
-		private final String name;
-
-		/**
-		 * Stream definition.
-		 */
-		private final String definition;
-
-		/**
-		 * Construct a StreamDeploymentRequest.
-		 *
-		 * @param name        stream name
-		 * @param definition  stream definition (pipe delimited list of modules)
-		 */
-		public StreamDeploymentRequest(String name, String definition) {
-			this.name = name;
-			this.definition = definition;
-		}
-
-		@Override
-		public Void call() throws Exception {
-			INSTANCE.handleStreamDeployment(name, definition);
-			return null;
-		}
-	}
-
-	/**
-	 * Start an Admin server. A ZooKeeper host:port may be optionally
-	 * passed in as an argument. The default ZooKeeper host/port is
-	 * {@code localhost:2181}.
-	 *
-	 * @param args command line arguments
-	 *
-	 * @throws Exception
-	 */
-	public static void main(String[] args) throws Exception {
-		INSTANCE = new AdminServer(args.length == 1 ? args[0] : "localhost:2181");
-		INSTANCE.run();
 	}
 
 }

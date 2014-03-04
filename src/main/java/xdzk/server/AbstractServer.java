@@ -21,11 +21,13 @@ import java.util.UUID;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.apache.curator.framework.state.ConnectionState;
 import org.apache.curator.framework.state.ConnectionStateListener;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.SmartLifecycle;
 import xdzk.curator.Paths;
 
 /**
@@ -34,7 +36,7 @@ import xdzk.curator.Paths;
  * @author Patrick Peralta
  * @author Mark Fisher
  */
-public class AbstractServer implements Runnable {
+public class AbstractServer implements Runnable, SmartLifecycle {
 
 	/**
 	 * Logger.
@@ -91,10 +93,56 @@ public class AbstractServer implements Runnable {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 * <p/>
 	 * Start the server.
 	 */
+	@Override
 	public void start() {
 		client.start();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * <p/>
+	 * Stop the server.
+	 */
+	@Override
+	public void stop() {
+		client.close();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isRunning() {
+		return client.getState() == CuratorFrameworkState.STARTED;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public boolean isAutoStartup() {
+		return true;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void stop(Runnable callback) {
+		stop();
+		callback.run();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public int getPhase() {
+		return Integer.MAX_VALUE;
 	}
 
 	/**

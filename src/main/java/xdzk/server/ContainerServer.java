@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import xdzk.core.MapBytesUtility;
 import xdzk.core.Module;
 import xdzk.core.ModuleRepository;
-import xdzk.core.StubModuleRepository;
 import xdzk.curator.Paths;
 
 /**
@@ -65,21 +64,22 @@ public class ContainerServer extends AbstractServer {
 	/**
 	 * Utility to convert maps to byte arrays.
 	 */
-	private final MapBytesUtility mapBytesUtility = new MapBytesUtility();
+	private final MapBytesUtility mapBytesUtility;
 
 	/**
 	 * Module repository.
 	 */
-	// TODO: make this pluggable
-	private final ModuleRepository moduleRepository = new StubModuleRepository();
+	private final ModuleRepository moduleRepository;
 
 	/**
 	 * Server constructor.
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
 	 */
-	public ContainerServer(String hostPort) {
+	public ContainerServer(String hostPort, MapBytesUtility mapBytesUtility, ModuleRepository moduleRepository) {
 		super(hostPort);
+		this.mapBytesUtility = mapBytesUtility;
+		this.moduleRepository = moduleRepository;
 	}
 
 	/**
@@ -211,19 +211,6 @@ public class ContainerServer extends AbstractServer {
 					break;
 			}
 		}
-	}
-
-	/**
-	 * Start a container node. A ZooKeeper host:port may be optionally
-	 * passed in as an argument. The default ZooKeeper host/port is
-	 * {@code localhost:2181}.
-	 *
-	 * @param args command line arguments
-	 *
-	 * @throws Exception
-	 */
-	public static void main(String[] args) throws Exception {
-		new ContainerServer(args.length == 1 ? args[0] : "localhost:2181").run();
 	}
 
 }
