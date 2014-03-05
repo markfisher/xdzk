@@ -28,6 +28,7 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
+import org.springframework.util.Assert;
 import xdzk.curator.Paths;
 
 /**
@@ -71,12 +72,14 @@ public class AbstractServer implements Runnable, SmartLifecycle {
 	 * @param hostPort host name and port number in the format {@code host:port}.
 	 */
 	AbstractServer(String hostPort) {
+		Assert.hasText(hostPort, "host:port for ZooKeeper required");
 		id = UUID.randomUUID().toString();
 		client = CuratorFrameworkFactory.builder()
 				.namespace(Paths.XD_NAMESPACE)
 				.retryPolicy(retryPolicy)
 				.connectString(hostPort).build();
 		client.getConnectionStateListenable().addListener(connectionListener);
+		LOG.info("ZooKeeper host: {}", hostPort);
 	}
 
 	/**

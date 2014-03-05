@@ -163,10 +163,10 @@ public class AdminContainerObserverTest {
 			// a break point should be set in here to pause execution of
 			// the test while another debug session is launched to attach
 			// to the admin server.
-			adminServer = launch(AdminApplication.class, true, zkAddress);
-			container1 = launch(ContainerApplication.class, false, zkAddress);
-			container2 = launch(ContainerApplication.class, false, zkAddress);
-			container3 = launch(ContainerApplication.class, false, zkAddress);
+			adminServer = launch(AdminApplication.class, true, "--zk=" + zkAddress);
+			container1 = launch(ContainerApplication.class, false, "--zk=" + zkAddress);
+			container2 = launch(ContainerApplication.class, false, "--zk=" + zkAddress);
+			container3 = launch(ContainerApplication.class, false, "--zk=" + zkAddress);
 
 			Eventually.assertThat(eventually(invoking(this).getCurrentContainers(adminServer).size()), is(3),
 					90, TimeUnit.SECONDS);
