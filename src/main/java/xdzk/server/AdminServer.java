@@ -17,8 +17,11 @@
 package xdzk.server;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.curator.framework.CuratorFramework;
@@ -37,7 +40,10 @@ import org.springframework.core.convert.converter.Converter;
 
 import xdzk.cluster.ContainerRepository;
 import xdzk.cluster.Container;
+import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
+import xdzk.core.Stream;
+import xdzk.core.StreamFactory;
 import xdzk.curator.Paths;
 import xdzk.curator.ChildPathIterator;
 import xdzk.core.MapBytesUtility;
@@ -113,6 +119,10 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 */
 	private final ModuleRepository moduleRepository;
 
+	/**
+	 * Stream factory.
+	 */
+	private final StreamFactory streamFactory;
 
 	/**
 	 * Server constructor.
@@ -123,6 +133,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		super(hostPort);
 		this.mapBytesUtility = mapBytesUtility;
 		this.moduleRepository = moduleRepository;
+		this.streamFactory = new StreamFactory(moduleRepository); // todo: use DI
 	}
 
 	/**
@@ -279,7 +290,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 					LOG.info("Container updated: {}", Paths.stripPath(event.getData().getPath()));
 					break;
 				case CHILD_REMOVED:
-					LOG.info("Container removed: {}", Paths.stripPath(event.getData().getPath()));
+					onChildLeft(client, event.getData());
 					break;
 				case CONNECTION_SUSPENDED:
 					break;
@@ -289,6 +300,65 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 					break;
 				case INITIALIZED:
 					break;
+			}
+		}
+
+		private void onChildLeft(CuratorFramework client, ChildData data) {
+			// find all of the deployments for the container that left
+			String container = Paths.stripPath(data.getPath());
+			LOG.info("Container departed: {}", container);
+
+			try {
+				Map<String, Stream> streamMap = new HashMap<String, Stream>();
+				List<String> deployments = client.getChildren().forPath(Paths.createPath(Paths.DEPLOYMENTS, container));
+				for (String deployment : deployments) {
+					String[] parts = deployment.split("\\.");
+					String streamName = parts[0];
+					String moduleType = parts[1];
+					String moduleName = parts[2];
+
+					Stream stream = streamMap.get(streamName);
+					if (stream == null) {
+						stream = streamFactory.createStream(streamName, mapBytesUtility.toMap(
+								client.getData().forPath(Paths.createPath(Paths.STREAMS, streamName))));
+						streamMap.put(streamName, stream);
+					}
+					ModuleDescriptor moduleDescriptor = stream.getModuleDescriptor(moduleName, moduleType);
+					if ("all".equals(moduleDescriptor.getGroup())) {
+						LOG.info("Module {} is deployed on every container, it does not need to be redeployed", moduleName);
+					}
+					else {
+						// for now assume that just one redeployment is needed
+
+						// todo: refactor duplicate code from StreamListener
+						Iterator<Container> iterator = stream.getContainerMatcher()
+								.match(moduleDescriptor, AdminServer.this).iterator();
+
+						if (iterator.hasNext()) {
+							Container targetContainer = iterator.next();
+							String targetName = targetContainer.getName();
+
+							LOG.info("Redeploying module {} for stream {} to container {}",
+									moduleName, streamName, targetName);
+
+							client.create().creatingParentsIfNeeded().forPath(
+									Paths.createPath(Paths.DEPLOYMENTS, targetName,
+											String.format("%s.%s.%s", streamName, moduleType, moduleName)));
+
+							// todo: not going to bother verifying the redeployment for now
+						}
+						else {
+							// uh oh
+							LOG.warn("No containers available for redeployment of {} for stream {}", moduleName, streamName);
+						}
+					}
+				}
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			catch (Exception e) {
+				throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
 			}
 		}
 	}

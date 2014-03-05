@@ -117,7 +117,7 @@ public class StreamListener implements PathChildrenCacheListener {
 	private void onChildAdded(CuratorFramework client, ChildData data) {
 		String streamName = Paths.stripPath(data.getPath());
 		Map<String, String> map = mapBytesUtility.toMap(data.getData());
-		Stream stream = streamFactory.createStream(streamName, map.get("definition"), map);
+		Stream stream = streamFactory.createStream(streamName, map);
 
 		LOG.info("Deploying stream {}", stream);
 

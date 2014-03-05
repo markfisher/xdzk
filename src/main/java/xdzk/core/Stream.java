@@ -162,6 +162,41 @@ public class Stream {
 	}
 
 	/**
+	 * Return the module descriptor for the given module name and type.
+	 *
+	 * @param moduleName  module name
+	 * @param moduleType  module type
+	 *
+	 * @return module descriptor
+	 *
+	 * @throws IllegalArgumentException if the module name/type cannot be found
+	 */
+	public ModuleDescriptor getModuleDescriptor(String moduleName, String moduleType) {
+		Module.Type type = Module.Type.valueOf(moduleType.toUpperCase());
+		ModuleDescriptor moduleDescriptor = null;
+		switch (type) {
+			case SOURCE:
+				moduleDescriptor = getSource();
+				break;
+			case SINK:
+				moduleDescriptor = getSink();
+				break;
+			case PROCESSOR:
+				for (ModuleDescriptor processor : processors) {
+					if (processor.getModule().getName().equals(moduleName)) {
+						moduleDescriptor = processor;
+						break;
+					}
+				}
+		}
+		if (moduleDescriptor == null || !moduleName.equals(moduleDescriptor.getModule().getName())) {
+			throw new IllegalArgumentException(String.format("Module %s of type %s not found", moduleName, moduleType));
+		}
+
+		return moduleDescriptor;
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override

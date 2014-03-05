@@ -30,11 +30,12 @@ public class StreamFactory {
 		this.moduleRepository = moduleRepository;
 	}
 
-	public Stream createStream(String name, String dsl, Map<String, String> properties) {
-		String[] modules = dsl.split("\\|");
+	public Stream createStream(String name, Map<String, String> properties) {
+		Assert.hasText(name);
+
+		String[] modules = properties.get("definition").split("\\|");
 
 		Stream.Builder builder = new Stream.Builder();
-		Assert.hasText(name);
 		builder.setName(name);
 		if (properties != null) {
 			builder.setProperties(properties);

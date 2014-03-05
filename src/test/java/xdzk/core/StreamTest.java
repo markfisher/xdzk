@@ -18,6 +18,7 @@ package xdzk.core;
 
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -31,7 +32,7 @@ public class StreamTest {
 	public void testSimpleStream() {
 		ModuleRepository moduleRepository = new StubModuleRepository();
 		StreamFactory streamFactory = new StreamFactory(moduleRepository);
-		Stream stream = streamFactory.createStream("ticktock", "time | log", null);
+		Stream stream = streamFactory.createStream("ticktock", Collections.singletonMap("definition", "time | log"));
 
 		assertEquals("ticktock", stream.getName());
 		Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator();
@@ -58,8 +59,8 @@ public class StreamTest {
 	public void testProcessorStream() {
 		ModuleRepository moduleRepository = new StubModuleRepository();
 		StreamFactory streamFactory = new StreamFactory(moduleRepository);
-
-		Stream stream = streamFactory.createStream("fancy-http", "http | transform | filter | log", null);
+		Stream stream = streamFactory.createStream("fancy-http",
+				Collections.singletonMap("definition", "http | transform | filter | log"));
 
 		assertEquals("fancy-http", stream.getName());
 		Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator();
