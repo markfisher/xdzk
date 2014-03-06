@@ -48,6 +48,11 @@ public class StreamWriter {
 		attributes.put("module.http.group", "all");
 		attributes.put("module.file.group", "all");
 		createStream(zk, "everywhere", "http | file", attributes);
+
+		// stream targeted to group
+		attributes = new HashMap<String, String>();
+		attributes.put("module.hdfs.group", "hdfs");
+		createStream(zk, "hdfs-writer", "http | hdfs", attributes);
 	}
 
 	private static void createStream(ZooKeeper client, String name, String definition, Map<String, String> attributes) {

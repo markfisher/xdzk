@@ -65,7 +65,8 @@ public class ContainerApplication {
 	 */
 	@Bean
 	public ContainerServer containerServer() {
-		return new ContainerServer(env.getProperty("zk", "localhost:2181"), mapBytesUtility(), moduleRepository());
+		return new ContainerServer(env.getProperty("zk", "localhost:2181"), env.getProperty("groups"),
+				mapBytesUtility(), moduleRepository());
 	}
 
 	/**

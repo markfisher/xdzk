@@ -16,6 +16,10 @@
 
 package xdzk.cluster;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
+
 import xdzk.core.ModuleDescriptor;
 
 import java.util.ArrayList;
@@ -35,6 +39,11 @@ import java.util.List;
  */
 public class DeploymentManifestMatcher implements ContainerMatcher {
 	/**
+	 * Logger.
+	 */
+	private static final Logger LOG = LoggerFactory.getLogger(DeploymentManifestMatcher.class);
+
+	/**
 	 * Current index for iterating over containers.
 	 */
 	private int index = 0;
@@ -44,17 +53,32 @@ public class DeploymentManifestMatcher implements ContainerMatcher {
 	 */
 	@Override
 	public Collection<Container> match(ModuleDescriptor moduleDescriptor, ContainerRepository containerRepository) {
+		// todo: this method needs unit testing
+		LOG.debug("Matching containers for module {}", moduleDescriptor);
+
+		String group = moduleDescriptor.getGroup();
 		List<Container> containers = new ArrayList<Container>();
 		Iterator<Container> iterator = containerRepository.getContainerIterator();
+		int c = 0;
 		while (iterator.hasNext()) {
-			containers.add(iterator.next());
+			c++;
+			Container container = iterator.next();
+			LOG.debug("Evaluating container {}", container);
+			if (group == null || group.equals("all") || container.getGroups().contains(group)) {
+				LOG.debug("\tAdded container {}", container);
+				containers.add(container);
+			}
 		}
+		LOG.debug("Evaluated {} containers", c);
 
-		if ("all".equals(moduleDescriptor.getGroup())) {
+		if (StringUtils.hasText(group)) {
+			// a group was specified for deployment;
+			// return all members of that group
 			return containers;
 		}
 		else {
-			// todo: needs unit testing
+			// create a new list with the specific number
+			// of targeted containers
 			List<Container> targets = new ArrayList<Container>();
 			while (targets.size() < moduleDescriptor.getCount()) {
 				if (index + 1 > containers.size()) {
@@ -62,7 +86,6 @@ public class DeploymentManifestMatcher implements ContainerMatcher {
 				}
 				targets.add(containers.get(index++));
 			}
-
 			return targets;
 		}
 	}

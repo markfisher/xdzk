@@ -134,6 +134,6 @@ public class ModuleDescriptor {
 	 */
 	@Override
 	public String toString() {
-		return module.getType() + "/" + module.getName();
+		return String.format("%s: %s type=%s, group=%s", label, module.getName(), module.getType(), group);
 	}
 }

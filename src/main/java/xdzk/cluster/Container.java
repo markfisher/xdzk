@@ -17,10 +17,13 @@
 package xdzk.cluster;
 
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Domain object for an XD container. This object is typically constructed
@@ -40,6 +43,11 @@ public class Container {
 	private final Map<String, String> attributes;
 
 	/**
+	 * Set of groups this container belongs to.
+	 */
+	private final Set<String> groups;
+
+	/**
 	 * Construct a Container object.
 	 *
 	 * @param name        container name
@@ -49,6 +57,15 @@ public class Container {
 		Assert.hasText(name);
 		this.name = name;
 		this.attributes = Collections.unmodifiableMap(new HashMap<String, String>(attributes));
+		String groupList = attributes.get("groups");
+		if (groupList == null) {
+			groups = Collections.emptySet();
+		}
+		else {
+			Set<String> set = new HashSet<String>();
+			Collections.addAll(set, StringUtils.tokenizeToStringArray(groupList, ","));
+			this.groups = Collections.unmodifiableSet(set);
+		}
 	}
 
 	/**
@@ -67,6 +84,15 @@ public class Container {
 	 */
 	public Map<String, String> getAttributes() {
 		return attributes;
+	}
+
+	/**
+	 * Return the set of groups this container belongs to.
+	 *
+	 * @return read-only set of groups this container belongs to
+	 */
+	public Set<String> getGroups() {
+		return groups;
 	}
 
 	/**

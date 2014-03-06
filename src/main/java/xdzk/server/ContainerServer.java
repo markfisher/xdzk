@@ -19,7 +19,10 @@ package xdzk.server;
 import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
@@ -29,8 +32,12 @@ import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.curator.framework.state.ConnectionState;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.springframework.util.StringUtils;
+
 import xdzk.core.MapBytesUtility;
 import xdzk.core.Module;
 import xdzk.core.ModuleRepository;
@@ -72,12 +79,26 @@ public class ContainerServer extends AbstractServer {
 	private final ModuleRepository moduleRepository;
 
 	/**
+	 * The set of groups this container belongs to.
+	 */
+	private final Set<String> groups;
+
+	/**
 	 * Server constructor.
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
 	 */
-	public ContainerServer(String hostPort, MapBytesUtility mapBytesUtility, ModuleRepository moduleRepository) {
+	public ContainerServer(String hostPort, String groups, MapBytesUtility mapBytesUtility,
+			ModuleRepository moduleRepository) {
 		super(hostPort);
+		if (groups == null) {
+			this.groups = Collections.emptySet();
+		}
+		else {
+			Set<String> set = new HashSet<String>();
+			Collections.addAll(set, StringUtils.tokenizeToStringArray(groups, ","));
+			this.groups = Collections.unmodifiableSet(set);
+		}
 		this.mapBytesUtility = mapBytesUtility;
 		this.moduleRepository = moduleRepository;
 	}
@@ -104,8 +125,19 @@ public class ContainerServer extends AbstractServer {
 			map.put("pid", tokens[0]);
 			map.put("host", tokens[1]);
 
+			StringBuilder builder = new StringBuilder();
+			Iterator<String> iterator = groups.iterator();
+			while (iterator.hasNext()) {
+				builder.append(iterator.next());
+				if (iterator.hasNext()) {
+					builder.append(',');
+				}
+			}
+			map.put("groups", builder.toString());
+
 			client.create().withMode(CreateMode.EPHEMERAL).forPath(
-					Paths.CONTAINERS + "/" + this.getId(), mapBytesUtility.toByteArray(map));
+					Paths.createPath(Paths.CONTAINERS, this.getId()),
+					mapBytesUtility.toByteArray(map));
 
 			deployments.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
 

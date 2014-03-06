@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.util.StringUtils;
 
 import xdzk.cluster.ContainerRepository;
 import xdzk.cluster.Container;
@@ -309,10 +310,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 						streamMap.put(streamName, stream);
 					}
 					ModuleDescriptor moduleDescriptor = stream.getModuleDescriptor(moduleName, moduleType);
-					if ("all".equals(moduleDescriptor.getGroup())) {
-						LOG.info("Module {} is deployed on every container, it does not need to be redeployed", moduleName);
-					}
-					else {
+					if (StringUtils.isEmpty(moduleDescriptor.getGroup())) {
 						// for now assume that just one redeployment is needed
 
 						// todo: refactor duplicate code from StreamListener
@@ -336,6 +334,10 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 							// uh oh
 							LOG.warn("No containers available for redeployment of {} for stream {}", moduleName, streamName);
 						}
+					}
+					else {
+						LOG.info("Module {} is targeted to containers belonging to group '{}'; it does not need to be redeployed",
+								moduleName, moduleDescriptor.getGroup());
 					}
 				}
 			}
