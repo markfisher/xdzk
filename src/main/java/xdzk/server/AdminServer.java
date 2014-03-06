@@ -75,19 +75,10 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	private volatile PathChildrenCache containers;
 
 	/**
-	 * Listener implementation that handles container additions and removals.
-	 */
-	private final PathChildrenCacheListener containerListener = new ContainerListener();
-
-	/**
 	 * Cache of children under the streams path. This path is used to track stream
 	 * deployment requests. Marked volatile because this reference is written by
 	 * the Curator thread that handles leader election and read by public
 	 * method {@link #getStreamPaths}.
-	 */
-	/*
-	 * todo: perhaps this does not need to be a member since getStreamPaths
-	 * isn't invoked at the moment
 	 */
 	private volatile PathChildrenCache streams;
 
@@ -196,10 +187,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			Paths.ensurePath(client, Paths.CONTAINERS);
 			Paths.ensurePath(client, Paths.STREAMS);
 
-			containers = new PathChildrenCache(client, Paths.CONTAINERS, true);
-			containers.getListenable().addListener(containerListener);
-			containers.start();
-
 			leaderSelector = new LeaderSelector(client, Paths.createPathWithNamespace(Paths.ADMIN), leaderListener);
 			leaderSelector.setId(getId());
 			leaderSelector.start();
@@ -219,9 +206,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	protected void onDisconnect(ConnectionState newState) {
 		try {
 			leaderSelector.close();
-
-			containers.getListenable().removeListener(containerListener);
-			containers.close();
 		}
 		catch (IllegalStateException e) {
 			// IllegalStateException is thrown if leaderSelector or
@@ -371,10 +355,16 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		@Override
 		public void takeLeadership(CuratorFramework client) throws Exception {
 			LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
+			PathChildrenCacheListener containerListener = new ContainerListener();
+
 			PathChildrenCacheListener streamListener =
 					new StreamListener(AdminServer.this, moduleRepository);
 
 			try {
+				containers = new PathChildrenCache(client, Paths.CONTAINERS, true);
+				containers.getListenable().addListener(containerListener);
+				containers.start();
+
 				streams = new PathChildrenCache(client, Paths.STREAMS, true);
 				streams.getListenable().addListener(streamListener);
 				streams.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
@@ -388,6 +378,9 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			finally {
 				streams.getListenable().removeListener(streamListener);
 				streams.close();
+
+				containers.getListenable().removeListener(containerListener);
+				containers.close();
 			}
 		}
 	}
