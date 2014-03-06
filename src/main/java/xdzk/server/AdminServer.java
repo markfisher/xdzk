@@ -300,6 +300,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 					String streamName = parts[0];
 					String moduleType = parts[1];
 					String moduleName = parts[2];
+					String moduleLabel = parts[3];
 
 					Stream stream = streamMap.get(streamName);
 					if (stream == null) {
@@ -327,7 +328,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 
 							client.create().creatingParentsIfNeeded().forPath(
 									Paths.createPath(Paths.DEPLOYMENTS, targetName,
-											String.format("%s.%s.%s", streamName, moduleType, moduleName)));
+											String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
 
 							// todo: not going to bother verifying the redeployment for now
 						}

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -313,19 +314,9 @@ public class Stream {
 		private String name;
 
 		/**
-		 * Source module.
+		 * Map of module labels to modules.
 		 */
-		private Module source;
-
-		/**
-		 * List of processor modules.
-		 */
-		private List<Module> processors = new ArrayList<Module>();
-
-		/**
-		 * Sink module.
-		 */
-		private Module sink;
+		private Map<String, Module> modules = new LinkedHashMap<String, Module>();
 
 		/**
 		 * Container matcher. Defaults to {@link DeploymentManifestMatcher}.
@@ -354,23 +345,15 @@ public class Stream {
 		 * modules will be added to the stream in the order
 		 * they are added to this builder.
 		 *
-		 * @param module module to add
-		 *
+		 * @param module  module to add
+		 * @param label   label for this module
 		 * @return this builder
 		 */
-		public Builder addModule(Module module) {
-			switch (module.getType()) {
-				case SOURCE:
-					source = module;
-					break;
-				case PROCESSOR:
-					processors.add(module);
-					break;
-				case SINK:
-					sink = module;
-					break;
+		public Builder addModule(Module module, String label) {
+			if (modules.containsKey(label)) {
+				throw new IllegalArgumentException(String.format("Label %s already in use", label));
 			}
-
+			modules.put(label, module);
 			return this;
 		}
 
@@ -392,21 +375,32 @@ public class Stream {
 		 * @return new Stream instance
 		 */
 		public Stream build() {
-			ModuleDescriptor sourceDescriptor = new ModuleDescriptor(source, name, -1,
-					properties.get(String.format("module.%s.group", source.getName())),
-					convert(properties.get(String.format("module.%s.count", source.getName()))));
-
+			ModuleDescriptor sourceDescriptor = null;
+			ModuleDescriptor sinkDescriptor = null;
 			List<ModuleDescriptor> processorDescriptors = new ArrayList<ModuleDescriptor>();
 			int i = 0;
-			for (Module module : processors) {
-				processorDescriptors.add(new ModuleDescriptor(module, name, i++,
-						properties.get(String.format("module.%s.group", module.getName())),
-						convert(properties.get(String.format("module.%s.count", module.getName())))));
+
+			for (Map.Entry<String, Module> entry : modules.entrySet()) {
+				String label = entry.getKey();
+				Module module = entry.getValue();
+				String group = properties.get(String.format("module.%s.group", module.getName()));
+				int count = convert(properties.get(String.format("module.%s.count", module.getName())));
+
+				ModuleDescriptor descriptor = new ModuleDescriptor(module, name, label, i++, group, count);
+				switch (module.getType()) {
+					case SOURCE:
+						sourceDescriptor = descriptor;
+						break;
+					case PROCESSOR:
+						processorDescriptors.add(descriptor);
+						break;
+					case SINK:
+						sinkDescriptor = descriptor;
+				}
 			}
 
-			ModuleDescriptor sinkDescriptor = new ModuleDescriptor(sink, name, -1,
-					properties.get(String.format("module.%s.group", sink.getName())),
-					convert(properties.get(String.format("module.%s.count", sink.getName()))));
+			Assert.notNull(sourceDescriptor);
+			Assert.notNull(sinkDescriptor);
 
 			// TODO: if the manifest includes a container matcher, an instance should
 			// be obtained and passed along to the constructor. Perhaps this can

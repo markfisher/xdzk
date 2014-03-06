@@ -34,6 +34,12 @@ public class ModuleDescriptor {
 	private final String streamName;
 
 	/**
+	 * Label used to uniquely identify this module in the context
+	 * of the stream it belongs to.
+	 */
+	private final String label;
+
+	/**
 	 * Order of processing for this module. Only applies to modules of type
 	 * {@link xdzk.core.Module.Type#PROCESSOR}.
 	 */
@@ -58,9 +64,10 @@ public class ModuleDescriptor {
 	 * @param group       container group this module should be deployed to
 	 * @param count       number of container instances this module should be deployed to
 	 */
-	public ModuleDescriptor(Module module, String streamName, int index, String group, int count) {
+	public ModuleDescriptor(Module module, String streamName, String label, int index, String group, int count) {
 		this.module = module;
 		this.streamName = streamName;
+		this.label = label;
 		this.index = index;
 		this.group = group;
 		this.count = count;
@@ -82,6 +89,15 @@ public class ModuleDescriptor {
 	 */
 	public String getStreamName() {
 		return streamName;
+	}
+
+	/**
+	 * Return the label for this module as defined by its stream.
+	 *
+	 * @return label for this module
+	 */
+	public String getLabel() {
+		return label;
 	}
 
 	/**

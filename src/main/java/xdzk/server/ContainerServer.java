@@ -95,7 +95,7 @@ public class ContainerServer extends AbstractServer {
 			Paths.ensurePath(client, Paths.DEPLOYMENTS);
 			Paths.ensurePath(client, Paths.CONTAINERS);
 
-			deployments = new PathChildrenCache(client, Paths.DEPLOYMENTS + "/" + this.getId(), true);
+			deployments = new PathChildrenCache(client, Paths.createPath(Paths.DEPLOYMENTS, this.getId()), true);
 			deployments.getListenable().addListener(deploymentListener);
 
 			String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
@@ -145,16 +145,19 @@ public class ContainerServer extends AbstractServer {
 		String streamName = split[0];
 		String moduleType = split[1];
 		String moduleName = split[2];
+		String moduleLabel = split[3];
 
-		LOG.info("Deploying module {} for stream {}", moduleName, streamName);
+		LOG.info("Deploying module '{}' for stream '{}'", moduleName, streamName);
+		LOG.debug("streamName={}, moduleType={}, moduleName={}, moduleLabel={}", streamName, moduleType, moduleName, moduleLabel);
 
 		Module module = moduleRepository.loadModule(moduleName, Module.Type.valueOf(moduleType.toUpperCase()));
 
-		LOG.info("Loading module from {}", module.getUrl());
+		LOG.debug("Loading module from {}", module.getUrl());
 
 		// todo: this is where we load the module
 
-		String streamPath = Paths.createPath(Paths.STREAMS, streamName, moduleType, moduleName, getId());
+		String streamPath = Paths.createPath(Paths.STREAMS, streamName, moduleType,
+				String.format("%s.%s", moduleName, moduleLabel), getId());
 
 		try {
 			// this indicates that the container has deployed the module

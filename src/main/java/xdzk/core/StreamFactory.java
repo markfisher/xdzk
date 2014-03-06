@@ -31,10 +31,12 @@ public class StreamFactory {
 	}
 
 	public Stream createStream(String name, Map<String, String> properties) {
-		Assert.hasText(name);
+		Assert.hasText(name, "Stream name is required");
 
-		String[] modules = properties.get("definition").split("\\|");
+		String definition = properties.get("definition");
+		Assert.hasText(definition, "Stream deployment manifest requires a 'definition' property");
 
+		String[] modules = definition.split("\\|");
 		Stream.Builder builder = new Stream.Builder();
 		builder.setName(name);
 		if (properties != null) {
@@ -42,12 +44,30 @@ public class StreamFactory {
 		}
 
 		for (int i = 0; i < modules.length; i++) {
-			Module module = moduleRepository.loadModule(modules[i].trim(),
+			String moduleDefinition = modules[i].trim();
+			String moduleName;
+			String label;
+
+			// TODO: naive parsing, the following formats are supported
+			// source | processor | sink
+			// source | p1: processor | p2: processor | sink
+			// where p1 is the alias
+			if (moduleDefinition.contains(":")) {
+				String[] split = moduleDefinition.split("\\:");
+				label = split[0].trim();
+				moduleName = split[1].trim();
+			}
+			else {
+				moduleName = moduleDefinition;
+				label = String.format("%s-%d", moduleName, i);
+			}
+
+			Module module = moduleRepository.loadModule(moduleName,
 					i == 0 ? Module.Type.SOURCE
 							: i == modules.length - 1 ? Module.Type.SINK
 							: Module.Type.PROCESSOR);
 
-			builder.addModule(module);
+			builder.addModule(module, label);
 		}
 
 		return builder.build();

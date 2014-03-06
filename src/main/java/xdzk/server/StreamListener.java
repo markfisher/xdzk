@@ -151,11 +151,13 @@ public class StreamListener implements PathChildrenCacheListener {
 	private void prepareStream(CuratorFramework client, Stream stream) throws Exception {
 		for (Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator(); iterator.hasNext();) {
 			ModuleDescriptor module = iterator.next();
+			String streamName = stream.getName();
+			String moduleType = module.getModule().getType().toString();
 			String moduleName = module.getModule().getName();
+			String moduleLabel = module.getLabel();
 
-			// TODO: the processors MUST be ordered! They are not right now
-			String path = Paths.createPath(Paths.STREAMS, stream.getName(),
-					module.getModule().getType().toString(), moduleName);
+			String path = Paths.createPath(Paths.STREAMS, streamName,
+					moduleType, String.format("%s.%s", moduleName, moduleLabel));
 
 			try {
 				client.create().creatingParentsIfNeeded().forPath(path);
@@ -181,6 +183,7 @@ public class StreamListener implements PathChildrenCacheListener {
 			String streamName = stream.getName();
 			String moduleType = module.getModule().getType().toString();
 			String moduleName = module.getModule().getName();
+			String moduleLabel = module.getLabel();
 			Map<Container, String> mapDeploymentStatus = new HashMap<Container, String>();
 
 			for (Container container : stream.getContainerMatcher().match(module, containerRepository)) {
@@ -188,10 +191,11 @@ public class StreamListener implements PathChildrenCacheListener {
 				try {
 					client.create().creatingParentsIfNeeded().forPath(
 							Paths.createPath(Paths.DEPLOYMENTS, containerName,
-									String.format("%s.%s.%s", streamName, moduleType, moduleName)));
+									String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
 
 					mapDeploymentStatus.put(container,
-							Paths.createPath(Paths.STREAMS, streamName, moduleType, moduleName, containerName));
+							Paths.createPath(Paths.STREAMS, streamName, moduleType,
+									String.format("%s.%s", moduleName, moduleLabel), containerName));
 				}
 				catch (KeeperException.NodeExistsException e) {
 					LOG.info("Module {} is already deployed to container {}", module, container);
