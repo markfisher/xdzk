@@ -16,12 +16,15 @@
 
 package xdzk.curator;
 
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
 
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.util.Assert;
 
 /**
  * Iterator over {@link ChildData} instances that are managed by {@link PathChildrenCache}.
@@ -49,8 +52,12 @@ public class ChildPathIterator<T> implements Iterator<T> {
 	 * @param cache      source for children nodes
 	 */
 	public ChildPathIterator(Converter<ChildData, T> converter, PathChildrenCache cache) {
+		Assert.notNull(converter);
+		Assert.notNull(cache);
+
 		this.converter = converter;
-		this.iterator = cache.getCurrentData().iterator();
+		List<ChildData> list = cache.getCurrentData();
+		this.iterator = list == null ? Collections.<ChildData>emptyIterator() : list.iterator();
 	}
 
 	/**

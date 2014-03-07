@@ -30,10 +30,11 @@ import java.util.List;
 /**
  * Implementation of {@link ContainerMatcher} that returns a collection of
  * containers to deploy a {@link ModuleDescriptor} to. If the manifest specifies
- * a group of "all" for a module, all available containers are returned.
+ * a count of 0 for a module, all available containers are returned.
  * Otherwise a collection of at least one {@link Container} is returned
  * for module deployment. An attempt at round robin distribution will be
- * made (but not guaranteed).
+ * made (but not guaranteed). If a group for a module is specified,
+ * only containers that belong to that group will be returned.
  *
  * @author Patrick Peralta
  */
@@ -57,28 +58,33 @@ public class DeploymentManifestMatcher implements ContainerMatcher {
 		LOG.debug("Matching containers for module {}", moduleDescriptor);
 
 		String group = moduleDescriptor.getGroup();
-		List<Container> containers = new ArrayList<Container>();
+		List<Container> candidates = new ArrayList<Container>();
 
 		for (Iterator<Container> iterator = containerRepository.getContainerIterator(); iterator.hasNext();) {
 			Container container = iterator.next();
 			LOG.trace("Evaluating container {}", container);
 			if (group == null || container.getGroups().contains(group)) {
 				LOG.trace("\tAdded container {}", container);
-				containers.add(container);
+				candidates.add(container);
 			}
+		}
+
+		if (candidates.isEmpty()) {
+			// there are no containers available
+			return candidates;
 		}
 
 		int count = moduleDescriptor.getCount();
 		if (count <= 0) {
 			// count of 0 means all members of the group;
 			// if no group specified it means all containers
-			return containers;
+			return candidates;
 		}
 		else if (count == 1) {
-			if (index + 1 > containers.size()) {
+			if (index + 1 > candidates.size()) {
 				index = 0;
 			}
-			return Collections.singleton(containers.get(index++));
+			return Collections.singleton(candidates.get(index++));
 		}
 		else {
 			// create a new list with the specific number
@@ -89,10 +95,10 @@ public class DeploymentManifestMatcher implements ContainerMatcher {
 			// containers may get multiple deployments if the module
 			// specifies more deployments than containers
 			while (targets.size() < count) {
-				if (index + 1 > containers.size()) {
+				if (index + 1 > candidates.size()) {
 					index = 0;
 				}
-				targets.add(containers.get(index++));
+				targets.add(candidates.get(index++));
 			}
 			return targets;
 		}

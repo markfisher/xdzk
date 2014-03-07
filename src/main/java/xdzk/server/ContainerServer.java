@@ -139,7 +139,7 @@ public class ContainerServer extends AbstractServer {
 					Paths.createPath(Paths.CONTAINERS, this.getId()),
 					mapBytesUtility.toByteArray(map));
 
-			deployments.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
+			deployments.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
 
 			LOG.info("Started container {} with attributes: {} ", this.getId(), map);
 		}

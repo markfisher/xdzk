@@ -67,7 +67,8 @@ public class StreamListener implements PathChildrenCacheListener {
 	/**
 	 * Construct a StreamListener.
 	 *
-	 * @param containerRepository admin server that this listener is attached to
+	 * @param containerRepository repository to obtain container data
+	 * @param moduleRepository    repository to obtain module data
 	 */
 	public StreamListener(ContainerRepository containerRepository, ModuleRepository moduleRepository) {
 		this.containerRepository = containerRepository;
@@ -137,10 +138,9 @@ public class StreamListener implements PathChildrenCacheListener {
 	 * Prepare the new stream for deployment. This updates the ZooKeeper znode
 	 * for the stream by adding the following under {@code /xd/streams/[stream-name]}:
 	 * <ul>
-	 *     <li>{@code .../source/[module-name]}</li>
-	 *     <li>{@code .../processor0/[module-name]}</li>
-	 *     <li>{@code .../processor1/[module-name]}</li>
-	 *     <li>{@code .../sink/[module-name]}</li>
+	 *     <li>{@code .../source/[module-name.module-label]}</li>
+	 *     <li>{@code .../processor/[module-name.module-label]}</li>
+	 *     <li>{@code .../sink/[module-name.module-label]}</li>
 	 * </ul>
 	 * The children of these nodes will be ephemeral nodes written by the containers
 	 * that accept deployment of the modules.

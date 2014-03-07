@@ -17,17 +17,13 @@
 package xdzk.server;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
-import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.curator.framework.recipes.leader.LeaderSelector;
 import org.apache.curator.framework.recipes.leader.LeaderSelectorListener;
@@ -37,17 +33,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.util.StringUtils;
 
 import xdzk.cluster.ContainerRepository;
 import xdzk.cluster.Container;
-import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
-import xdzk.core.Stream;
+import xdzk.core.MapBytesUtility;
 import xdzk.core.StreamFactory;
 import xdzk.curator.Paths;
 import xdzk.curator.ChildPathIterator;
-import xdzk.core.MapBytesUtility;
 
 /**
  * Prototype implementation of an XD admin server that watches ZooKeeper
@@ -111,10 +104,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 */
 	private final ModuleRepository moduleRepository;
 
-	/**
-	 * Stream factory.
-	 */
-	private final StreamFactory streamFactory;
 
 	/**
 	 * Server constructor.
@@ -125,7 +114,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		super(hostPort);
 		this.mapBytesUtility = mapBytesUtility;
 		this.moduleRepository = moduleRepository;
-		this.streamFactory = new StreamFactory(moduleRepository); // todo: use DI
 	}
 
 	/**
@@ -261,113 +249,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	}
 
 	/**
-	 * Listener implementation that is invoked when containers are added/removed/modified.
-	 */
-	class ContainerListener implements PathChildrenCacheListener {
-
-		@Override
-		public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
-			switch (event.getType()) {
-				case CHILD_ADDED:
-					LOG.info("Container added: {}", Paths.stripPath(event.getData().getPath()));
-					break;
-				case CHILD_UPDATED:
-					LOG.info("Container updated: {}", Paths.stripPath(event.getData().getPath()));
-					break;
-				case CHILD_REMOVED:
-					onChildLeft(client, event.getData());
-					break;
-				case CONNECTION_SUSPENDED:
-					break;
-				case CONNECTION_RECONNECTED:
-					break;
-				case CONNECTION_LOST:
-					break;
-				case INITIALIZED:
-					break;
-			}
-		}
-
-		/**
-		 * Handle the departure of a container.
-		 *
-		 * @param client  curator client
-		 * @param data    node data for the container that departed
-		 */
-		private void onChildLeft(CuratorFramework client, ChildData data) {
-			// find all of the deployments for the container that left
-			String container = Paths.stripPath(data.getPath());
-			LOG.info("Container departed: {}", container);
-
-			try {
-				Map<String, Stream> streamMap = new HashMap<String, Stream>();
-				List<String> deployments = client.getChildren().forPath(Paths.createPath(Paths.DEPLOYMENTS, container));
-				for (String deployment : deployments) {
-					String[] parts = deployment.split("\\.");
-					String streamName = parts[0];
-					String moduleType = parts[1];
-					String moduleName = parts[2];
-					String moduleLabel = parts[3];
-
-					Stream stream = streamMap.get(streamName);
-					if (stream == null) {
-						stream = streamFactory.createStream(streamName, mapBytesUtility.toMap(
-								client.getData().forPath(Paths.createPath(Paths.STREAMS, streamName))));
-						streamMap.put(streamName, stream);
-					}
-					ModuleDescriptor moduleDescriptor = stream.getModuleDescriptor(moduleName, moduleType);
-					if (moduleDescriptor.getCount() > 0) {
-						// for now assume that just one redeployment is needed
-
-						// todo: refactor duplicate code from StreamListener
-						Iterator<Container> iterator = stream.getContainerMatcher()
-								.match(moduleDescriptor, AdminServer.this).iterator();
-
-						if (iterator.hasNext()) {
-							Container targetContainer = iterator.next();
-							String targetName = targetContainer.getName();
-
-							LOG.info("Redeploying module {} for stream {} to container {}",
-									moduleName, streamName, targetName);
-
-							client.create().creatingParentsIfNeeded().forPath(
-									Paths.createPath(Paths.DEPLOYMENTS, targetName,
-											String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
-
-							// todo: not going to bother verifying the redeployment for now
-						}
-						else {
-							// uh oh
-							LOG.warn("No containers available for redeployment of {} for stream {}", moduleName, streamName);
-						}
-					}
-					else {
-						StringBuilder builder = new StringBuilder();
-						String group = moduleDescriptor.getGroup();
-						builder.append("Module '").append(moduleName).append("' with label '")
-								.append(moduleLabel).append("' is targeted to all containers");
-						if (StringUtils.hasText(group)) {
-							builder.append(" belonging to group '").append(group).append('\'');
-						}
-						builder.append("; it does not need to be redeployed");
-
-						LOG.info(builder.toString());
-					}
-				}
-
-				// remove the deployments from the departed container
-				client.delete().deletingChildrenIfNeeded().forPath(Paths.createPath(Paths.DEPLOYMENTS, container));
-			}
-			catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-			catch (Exception e) {
-				throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
-			}
-		}
-	}
-
-	/**
 	 * Listener implementation that is invoked when this server becomes the leader.
 	 */
 	class LeaderListener extends LeaderSelectorListenerAdapter {
@@ -375,19 +256,21 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		@Override
 		public void takeLeadership(CuratorFramework client) throws Exception {
 			LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
-			PathChildrenCacheListener containerListener = new ContainerListener();
 
-			PathChildrenCacheListener streamListener =
-					new StreamListener(AdminServer.this, moduleRepository);
-
+			PathChildrenCacheListener streamListener = null;
+			PathChildrenCacheListener containerListener = null;
 			try {
-				containers = new PathChildrenCache(client, Paths.CONTAINERS, true);
-				containers.getListenable().addListener(containerListener);
-				containers.start();
+				streamListener = new StreamListener(AdminServer.this, moduleRepository);
 
 				streams = new PathChildrenCache(client, Paths.STREAMS, true);
 				streams.getListenable().addListener(streamListener);
 				streams.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
+
+				containerListener = new ContainerListener(AdminServer.this, moduleRepository, streams);
+
+				containers = new PathChildrenCache(client, Paths.CONTAINERS, true);
+				containers.getListenable().addListener(containerListener);
+				containers.start();
 
 				Thread.sleep(Long.MAX_VALUE);
 			}
@@ -396,11 +279,15 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 				Thread.currentThread().interrupt();
 			}
 			finally {
-				streams.getListenable().removeListener(streamListener);
-				streams.close();
-
-				containers.getListenable().removeListener(containerListener);
+				if (containerListener != null) {
+					containers.getListenable().removeListener(containerListener);
+				}
 				containers.close();
+
+				if (streamListener != null) {
+					streams.getListenable().removeListener(streamListener);
+				}
+				streams.close();
 			}
 		}
 	}
