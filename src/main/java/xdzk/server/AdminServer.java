@@ -288,6 +288,12 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			}
 		}
 
+		/**
+		 * Handle the departure of a container.
+		 *
+		 * @param client  curator client
+		 * @param data    node data for the container that departed
+		 */
 		private void onChildLeft(CuratorFramework client, ChildData data) {
 			// find all of the deployments for the container that left
 			String container = Paths.stripPath(data.getPath());
@@ -310,7 +316,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 						streamMap.put(streamName, stream);
 					}
 					ModuleDescriptor moduleDescriptor = stream.getModuleDescriptor(moduleName, moduleType);
-					if (StringUtils.isEmpty(moduleDescriptor.getGroup())) {
+					if (moduleDescriptor.getCount() > 0) {
 						// for now assume that just one redeployment is needed
 
 						// todo: refactor duplicate code from StreamListener
@@ -336,10 +342,21 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 						}
 					}
 					else {
-						LOG.info("Module {} is targeted to containers belonging to group '{}'; it does not need to be redeployed",
-								moduleName, moduleDescriptor.getGroup());
+						StringBuilder builder = new StringBuilder();
+						String group = moduleDescriptor.getGroup();
+						builder.append("Module '").append(moduleName).append("' with label '")
+								.append(moduleLabel).append("' is targeted to all containers");
+						if (StringUtils.hasText(group)) {
+							builder.append(" belonging to group '").append(group).append('\'');
+						}
+						builder.append("; it does not need to be redeployed");
+
+						LOG.info(builder.toString());
 					}
 				}
+
+				// remove the deployments from the departed container
+				client.delete().deletingChildrenIfNeeded().forPath(Paths.createPath(Paths.DEPLOYMENTS, container));
 			}
 			catch (InterruptedException e) {
 				Thread.currentThread().interrupt();

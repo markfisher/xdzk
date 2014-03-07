@@ -45,13 +45,15 @@ public class StreamWriter {
 
 		// stream with deployment manifest
 		Map<String, String> attributes = new HashMap<String, String>();
-		attributes.put("module.http.group", "all");
-		attributes.put("module.file.group", "all");
+		attributes.put("module.http.count", "0");
+		attributes.put("module.file.count", "0");
 		createStream(zk, "everywhere", "http | file", attributes);
 
 		// stream targeted to group
 		attributes = new HashMap<String, String>();
 		attributes.put("module.hdfs.group", "hdfs");
+		attributes.put("module.http.group", "http");
+
 		createStream(zk, "hdfs-writer", "http | hdfs", attributes);
 	}
 

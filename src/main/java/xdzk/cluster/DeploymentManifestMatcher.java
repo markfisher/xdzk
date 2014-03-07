@@ -18,12 +18,12 @@ package xdzk.cluster;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.StringUtils;
 
 import xdzk.core.ModuleDescriptor;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -58,29 +58,37 @@ public class DeploymentManifestMatcher implements ContainerMatcher {
 
 		String group = moduleDescriptor.getGroup();
 		List<Container> containers = new ArrayList<Container>();
-		Iterator<Container> iterator = containerRepository.getContainerIterator();
-		int c = 0;
-		while (iterator.hasNext()) {
-			c++;
+
+		for (Iterator<Container> iterator = containerRepository.getContainerIterator(); iterator.hasNext();) {
 			Container container = iterator.next();
-			LOG.debug("Evaluating container {}", container);
-			if (group == null || group.equals("all") || container.getGroups().contains(group)) {
-				LOG.debug("\tAdded container {}", container);
+			LOG.trace("Evaluating container {}", container);
+			if (group == null || container.getGroups().contains(group)) {
+				LOG.trace("\tAdded container {}", container);
 				containers.add(container);
 			}
 		}
-		LOG.debug("Evaluated {} containers", c);
 
-		if (StringUtils.hasText(group)) {
-			// a group was specified for deployment;
-			// return all members of that group
+		int count = moduleDescriptor.getCount();
+		if (count <= 0) {
+			// count of 0 means all members of the group;
+			// if no group specified it means all containers
 			return containers;
+		}
+		else if (count == 1) {
+			if (index + 1 > containers.size()) {
+				index = 0;
+			}
+			return Collections.singleton(containers.get(index++));
 		}
 		else {
 			// create a new list with the specific number
 			// of targeted containers
 			List<Container> targets = new ArrayList<Container>();
-			while (targets.size() < moduleDescriptor.getCount()) {
+			// todo: this will create the exact number of module deployments
+			// regardless of the number of containers; this means some
+			// containers may get multiple deployments if the module
+			// specifies more deployments than containers
+			while (targets.size() < count) {
 				if (index + 1 > containers.size()) {
 					index = 0;
 				}
