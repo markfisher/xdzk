@@ -69,8 +69,8 @@ public class Paths {
 	 * @return string with path stripped
 	 */
 	public static String stripPath(String path) {
-		// todo: error handling
-		return path.substring(path.lastIndexOf('/') + 1);
+		int i = path.lastIndexOf('/');
+		return i > -1 ? path.substring(i + 1) : path;
 	}
 
 	/**
@@ -81,7 +81,7 @@ public class Paths {
 	 *
 	 * @return the full path
 	 */
-	public static String createPath(String... elements) {
+	public static String build(String... elements) {
 		StringBuilder builder = new StringBuilder();
 		for (int i = 0; i < elements.length; i++) {
 			builder.append(elements[i]);
@@ -102,8 +102,8 @@ public class Paths {
 	 *
 	 * @return the full path
 	 */
-	public static String createPathWithNamespace(String... elements) {
-		return '/' + XD_NAMESPACE + '/' + createPath(elements);
+	public static String buildWithNamespace(String... elements) {
+		return '/' + XD_NAMESPACE + '/' + build(elements);
 	}
 
 	/**

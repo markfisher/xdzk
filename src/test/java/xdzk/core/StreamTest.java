@@ -40,8 +40,8 @@ public class StreamTest {
 
 		String[] moduleNames = {"log", "time"};
 		for (String moduleName : moduleNames) {
-			ModuleDescriptor module = iterator.next();
-			assertEquals(moduleName, module.getModule().getName());
+			ModuleDescriptor descriptor = iterator.next();
+			assertEquals(moduleName, descriptor.getModule().getName());
 		}
 
 		assertFalse(iterator.hasNext());
@@ -68,8 +68,8 @@ public class StreamTest {
 
 		String[] moduleNames = {"log", "filter", "transform", "http"};
 		for (String moduleName : moduleNames) {
-			ModuleDescriptor module = iterator.next();
-			assertEquals(moduleName, module.getModule().getName());
+			ModuleDescriptor descriptor = iterator.next();
+			assertEquals(moduleName, descriptor.getModule().getName());
 		}
 
 		assertFalse(iterator.hasNext());

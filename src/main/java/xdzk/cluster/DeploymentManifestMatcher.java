@@ -54,7 +54,6 @@ public class DeploymentManifestMatcher implements ContainerMatcher {
 	 */
 	@Override
 	public Collection<Container> match(ModuleDescriptor moduleDescriptor, ContainerRepository containerRepository) {
-		// todo: this method needs unit testing
 		LOG.debug("Matching containers for module {}", moduleDescriptor);
 
 		String group = moduleDescriptor.getGroup();
@@ -75,27 +74,26 @@ public class DeploymentManifestMatcher implements ContainerMatcher {
 		}
 
 		int count = moduleDescriptor.getCount();
-		if (count <= 0) {
-			// count of 0 means all members of the group;
-			// if no group specified it means all containers
+		int candidateCount = candidates.size();
+		if (count <= 0 || count >= candidateCount) {
+			// count of 0 means all members of the group
+			// (if no group specified it means all containers);
+			// count >= candidates means each of the
+			// containers should host a module
 			return candidates;
 		}
 		else if (count == 1) {
-			if (index + 1 > candidates.size()) {
+			if (index + 1 > candidateCount) {
 				index = 0;
 			}
 			return Collections.singleton(candidates.get(index++));
 		}
 		else {
 			// create a new list with the specific number
-			// of targeted containers
+			// of targeted containers;
 			List<Container> targets = new ArrayList<Container>();
-			// todo: this will create the exact number of module deployments
-			// regardless of the number of containers; this means some
-			// containers may get multiple deployments if the module
-			// specifies more deployments than containers
 			while (targets.size() < count) {
-				if (index + 1 > candidates.size()) {
+				if (index + 1 > candidateCount) {
 					index = 0;
 				}
 				targets.add(candidates.get(index++));

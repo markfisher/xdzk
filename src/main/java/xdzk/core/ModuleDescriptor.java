@@ -24,7 +24,7 @@ package xdzk.core;
  */
 public class ModuleDescriptor {
 	/**
-	 * Module type.
+	 * The module.
 	 */
 	private final Module module;
 
@@ -58,8 +58,9 @@ public class ModuleDescriptor {
 	/**
 	 * Construct a ModuleDescriptor.
 	 *
-	 * @param module      module type
+	 * @param module      the module for this descriptor
 	 * @param streamName  name of stream using this module
+	 * @param label       label for this module as defined by its stream
 	 * @param index       order of processing for this module
 	 * @param group       container group this module should be deployed to
 	 * @param count       number of container instances this module should be deployed to
@@ -74,9 +75,9 @@ public class ModuleDescriptor {
 	}
 
 	/**
-	 * Return the module type.
+	 * Return the module for this descriptor.
 	 *
-	 * @return module type
+	 * @return the module
 	 */
 	public Module getModule() {
 		return module;
@@ -101,8 +102,9 @@ public class ModuleDescriptor {
 	}
 
 	/**
-	 * Return the order of processing for this module. Only applies to modules of type
-	 * {@link xdzk.core.Module.Type#PROCESSOR}.
+	 * Return the order of processing for this module. Module 0 indicates
+	 * this is a source module, 1 indicates that a source is sending
+	 * data to this module, etc.
 	 *
 	 * @return order of processing for this module
 	 */

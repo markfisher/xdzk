@@ -32,6 +32,7 @@ public class StreamFactory {
 
 	public Stream createStream(String name, Map<String, String> properties) {
 		Assert.hasText(name, "Stream name is required");
+		Assert.notNull(properties, "Stream properties are required");
 
 		String definition = properties.get("definition");
 		Assert.hasText(definition, "Stream deployment manifest requires a 'definition' property");

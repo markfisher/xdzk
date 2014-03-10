@@ -67,7 +67,7 @@ public class StreamWriter {
 				attributes.put("definition", definition);
 			}
 
-			client.create(Paths.createPathWithNamespace(Paths.STREAMS, name),
+			client.create(Paths.buildWithNamespace(Paths.STREAMS, name),
 					utility.toByteArray(attributes),
 					ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 		}

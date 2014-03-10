@@ -116,7 +116,7 @@ public class ContainerServer extends AbstractServer {
 			Paths.ensurePath(client, Paths.DEPLOYMENTS);
 			Paths.ensurePath(client, Paths.CONTAINERS);
 
-			deployments = new PathChildrenCache(client, Paths.createPath(Paths.DEPLOYMENTS, this.getId()), true);
+			deployments = new PathChildrenCache(client, Paths.build(Paths.DEPLOYMENTS, this.getId()), true);
 			deployments.getListenable().addListener(deploymentListener);
 
 			String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
@@ -136,7 +136,7 @@ public class ContainerServer extends AbstractServer {
 			map.put("groups", builder.toString());
 
 			client.create().withMode(CreateMode.EPHEMERAL).forPath(
-					Paths.createPath(Paths.CONTAINERS, this.getId()),
+					Paths.build(Paths.CONTAINERS, this.getId()),
 					mapBytesUtility.toByteArray(map));
 
 			deployments.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
@@ -188,7 +188,7 @@ public class ContainerServer extends AbstractServer {
 
 		// todo: this is where we load the module
 
-		String streamPath = Paths.createPath(Paths.STREAMS, streamName, moduleType,
+		String streamPath = Paths.build(Paths.STREAMS, streamName, moduleType,
 				String.format("%s.%s", moduleName, moduleLabel), getId());
 
 		try {
@@ -226,16 +226,6 @@ public class ContainerServer extends AbstractServer {
 			LOG.debug("Path cache event: {}", event);
 			switch (event.getType()) {
 				case INITIALIZED:
-					// todo: when the cache is initialized the getInitialData
-					// collection will contain all the children - instead of
-					// issuing a deployment this should perhaps determine
-					// if a deployment is required.
-
-					// For now just (wrongly) assume that everything
-					// should be deployed.
-					for (ChildData data : event.getInitialData()) {
-						onChildAdded(client, data);
-					}
 					break;
 				case CHILD_ADDED:
 					onChildAdded(client, event.getData());

@@ -38,7 +38,6 @@ import xdzk.cluster.ContainerRepository;
 import xdzk.cluster.Container;
 import xdzk.core.ModuleRepository;
 import xdzk.core.MapBytesUtility;
-import xdzk.core.StreamFactory;
 import xdzk.curator.Paths;
 import xdzk.curator.ChildPathIterator;
 
@@ -176,7 +175,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			Paths.ensurePath(client, Paths.CONTAINERS);
 			Paths.ensurePath(client, Paths.STREAMS);
 
-			leaderSelector = new LeaderSelector(client, Paths.createPathWithNamespace(Paths.ADMIN), leaderListener);
+			leaderSelector = new LeaderSelector(client, Paths.buildWithNamespace(Paths.ADMIN), leaderListener);
 			leaderSelector.setId(getId());
 			leaderSelector.start();
 		}
@@ -225,7 +224,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			throw new IllegalArgumentException("definition must not be null");
 		}
 		try {
-			getClient().create().forPath(Paths.createPath(Paths.STREAMS, name),
+			getClient().create().forPath(Paths.build(Paths.STREAMS, name),
 					mapBytesUtility.toByteArray(Collections.singletonMap("definition", definition)));
 		}
 		catch (Exception e) {

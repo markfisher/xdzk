@@ -145,7 +145,7 @@ public class ContainerListener implements PathChildrenCacheListener {
 					String moduleLabel = descriptor.getLabel();
 
 					// obtain all of the containers that have deployed this module
-					String streamPath = Paths.createPath(Paths.STREAMS, streamName, moduleType,
+					String streamPath = Paths.build(Paths.STREAMS, streamName, moduleType,
 							String.format("%s.%s", moduleName, moduleLabel));
 					List<String> containersForModule = client.getChildren().forPath(streamPath);
 					if (!containersForModule.contains(containerName)) {
@@ -158,10 +158,10 @@ public class ContainerListener implements PathChildrenCacheListener {
 							LOG.info("Deploying module {} to {}", moduleName, container);
 
 							client.create().creatingParentsIfNeeded().forPath(
-									Paths.createPath(Paths.DEPLOYMENTS, containerName,
+									Paths.build(Paths.DEPLOYMENTS, containerName,
 											String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
 
-							String path = Paths.createPath(Paths.STREAMS, streamName, moduleType,
+							String path = Paths.build(Paths.STREAMS, streamName, moduleType,
 									String.format("%s.%s", moduleName, moduleLabel), containerName);
 
 							// todo: make timeout configurable
@@ -198,7 +198,7 @@ public class ContainerListener implements PathChildrenCacheListener {
 
 		try {
 			Map<String, Stream> streamMap = new HashMap<String, Stream>();
-			List<String> deployments = client.getChildren().forPath(Paths.createPath(Paths.DEPLOYMENTS, container));
+			List<String> deployments = client.getChildren().forPath(Paths.build(Paths.DEPLOYMENTS, container));
 			for (String deployment : deployments) {
 				String[] parts = deployment.split("\\.");
 				String streamName = parts[0];
@@ -209,7 +209,7 @@ public class ContainerListener implements PathChildrenCacheListener {
 				Stream stream = streamMap.get(streamName);
 				if (stream == null) {
 					stream = streamFactory.createStream(streamName, mapBytesUtility.toMap(
-							client.getData().forPath(Paths.createPath(Paths.STREAMS, streamName))));
+							client.getData().forPath(Paths.build(Paths.STREAMS, streamName))));
 					streamMap.put(streamName, stream);
 				}
 				ModuleDescriptor moduleDescriptor = stream.getModuleDescriptor(moduleName, moduleType);
@@ -228,7 +228,7 @@ public class ContainerListener implements PathChildrenCacheListener {
 								moduleName, streamName, targetName);
 
 						client.create().creatingParentsIfNeeded().forPath(
-								Paths.createPath(Paths.DEPLOYMENTS, targetName,
+								Paths.build(Paths.DEPLOYMENTS, targetName,
 										String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
 
 						// todo: not going to bother verifying the redeployment for now
@@ -253,7 +253,7 @@ public class ContainerListener implements PathChildrenCacheListener {
 			}
 
 			// remove the deployments from the departed container
-			client.delete().deletingChildrenIfNeeded().forPath(Paths.createPath(Paths.DEPLOYMENTS, container));
+			client.delete().deletingChildrenIfNeeded().forPath(Paths.build(Paths.DEPLOYMENTS, container));
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();

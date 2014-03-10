@@ -156,7 +156,7 @@ public class StreamListener implements PathChildrenCacheListener {
 			String moduleName = module.getModule().getName();
 			String moduleLabel = module.getLabel();
 
-			String path = Paths.createPath(Paths.STREAMS, streamName,
+			String path = Paths.build(Paths.STREAMS, streamName,
 					moduleType, String.format("%s.%s", moduleName, moduleLabel));
 
 			try {
@@ -190,11 +190,11 @@ public class StreamListener implements PathChildrenCacheListener {
 				String containerName = container.getName();
 				try {
 					client.create().creatingParentsIfNeeded().forPath(
-							Paths.createPath(Paths.DEPLOYMENTS, containerName,
+							Paths.build(Paths.DEPLOYMENTS, containerName,
 									String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
 
 					mapDeploymentStatus.put(container,
-							Paths.createPath(Paths.STREAMS, streamName, moduleType,
+							Paths.build(Paths.STREAMS, streamName, moduleType,
 									String.format("%s.%s", moduleName, moduleLabel), containerName));
 				}
 				catch (KeeperException.NodeExistsException e) {
@@ -212,6 +212,7 @@ public class StreamListener implements PathChildrenCacheListener {
 					if (client.checkExists().forPath(entry.getValue()) != null) {
 						iteratorStatus.remove();
 					}
+					Thread.sleep(10);
 				}
 			}
 			while (!mapDeploymentStatus.isEmpty() && System.currentTimeMillis() < timeout);

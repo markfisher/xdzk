@@ -118,7 +118,7 @@ public class AdminApplication {
 			// an IllegalStateException is thrown; therefore
 			// don't hold the application context until the first refresh
 			if (applicationContext == null) {
-				applicationContext = (ApplicationContext) event.getSource();
+				applicationContext = event.getApplicationContext();
 			}
 		}
 	}
