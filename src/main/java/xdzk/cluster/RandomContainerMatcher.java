@@ -16,9 +16,11 @@
 
 package xdzk.cluster;
 
-import xdzk.core.Module;
+import xdzk.core.ModuleDescriptor;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
@@ -32,19 +34,20 @@ public class RandomContainerMatcher implements ContainerMatcher {
 	private static final Random RANDOM = new Random();
 
 	/**
+	 * {@inheritDoc}
+	 * <p/>
 	 * Randomly selects one of the candidate containers.
-	 *
-	 * @param module
-	 * @param containerRepository
 	 */
 	@Override
-	public Container match(Module module, ContainerRepository containerRepository) {
+	public Collection<Container> match(ModuleDescriptor moduleDescriptor, ContainerRepository containerRepository) {
 		List<Container> containers = new ArrayList<Container>();
 		Iterator<Container> iterator = containerRepository.getContainerIterator();
 		while (iterator.hasNext()) {
 			containers.add(iterator.next());
 		}
-		return containers.isEmpty() ? null : containers.get(RANDOM.nextInt(containers.size()));
+		return containers.isEmpty()
+				? Collections.<Container>emptySet()
+				: Collections.singleton(containers.get(RANDOM.nextInt(containers.size())));
 	}
 
 }

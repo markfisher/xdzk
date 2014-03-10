@@ -19,7 +19,10 @@ package xdzk.server;
 import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
@@ -29,8 +32,12 @@ import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.curator.framework.state.ConnectionState;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.springframework.util.StringUtils;
+
 import xdzk.core.MapBytesUtility;
 import xdzk.core.Module;
 import xdzk.core.ModuleRepository;
@@ -72,12 +79,26 @@ public class ContainerServer extends AbstractServer {
 	private final ModuleRepository moduleRepository;
 
 	/**
+	 * The set of groups this container belongs to.
+	 */
+	private final Set<String> groups;
+
+	/**
 	 * Server constructor.
 	 *
 	 * @param hostPort host name and port number in the format {@code host:port}.
 	 */
-	public ContainerServer(String hostPort, MapBytesUtility mapBytesUtility, ModuleRepository moduleRepository) {
+	public ContainerServer(String hostPort, String groups, MapBytesUtility mapBytesUtility,
+			ModuleRepository moduleRepository) {
 		super(hostPort);
+		if (groups == null) {
+			this.groups = Collections.emptySet();
+		}
+		else {
+			Set<String> set = new HashSet<String>();
+			Collections.addAll(set, StringUtils.tokenizeToStringArray(groups, ","));
+			this.groups = Collections.unmodifiableSet(set);
+		}
 		this.mapBytesUtility = mapBytesUtility;
 		this.moduleRepository = moduleRepository;
 	}
@@ -95,7 +116,7 @@ public class ContainerServer extends AbstractServer {
 			Paths.ensurePath(client, Paths.DEPLOYMENTS);
 			Paths.ensurePath(client, Paths.CONTAINERS);
 
-			deployments = new PathChildrenCache(client, Paths.DEPLOYMENTS + "/" + this.getId(), true);
+			deployments = new PathChildrenCache(client, Paths.build(Paths.DEPLOYMENTS, this.getId()), true);
 			deployments.getListenable().addListener(deploymentListener);
 
 			String mxBeanName = ManagementFactory.getRuntimeMXBean().getName();
@@ -104,10 +125,21 @@ public class ContainerServer extends AbstractServer {
 			map.put("pid", tokens[0]);
 			map.put("host", tokens[1]);
 
-			client.create().withMode(CreateMode.EPHEMERAL).forPath(
-					Paths.CONTAINERS + "/" + this.getId(), mapBytesUtility.toByteArray(map));
+			StringBuilder builder = new StringBuilder();
+			Iterator<String> iterator = groups.iterator();
+			while (iterator.hasNext()) {
+				builder.append(iterator.next());
+				if (iterator.hasNext()) {
+					builder.append(',');
+				}
+			}
+			map.put("groups", builder.toString());
 
-			deployments.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE);
+			client.create().withMode(CreateMode.EPHEMERAL).forPath(
+					Paths.build(Paths.CONTAINERS, this.getId()),
+					mapBytesUtility.toByteArray(map));
+
+			deployments.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
 
 			LOG.info("Started container {} with attributes: {} ", this.getId(), map);
 		}
@@ -140,25 +172,29 @@ public class ContainerServer extends AbstractServer {
 	 * @param data    module data
 	 */
 	private void onChildAdded(CuratorFramework client, ChildData data) {
-		Map<String, String> attributes = mapBytesUtility.toMap(data.getData());
-		String streamName = attributes.get("stream");
-		String moduleType = attributes.get("type");
-		String moduleName = Paths.stripPath(data.getPath());
+		String deploymentPath = Paths.stripPath(data.getPath());
+		String[] split = deploymentPath.split("\\.");
+		String streamName = split[0];
+		String moduleType = split[1];
+		String moduleName = split[2];
+		String moduleLabel = split[3];
 
-		LOG.info("Deploying module {} for stream {}", moduleName, streamName);
+		LOG.info("Deploying module '{}' for stream '{}'", moduleName, streamName);
+		LOG.debug("streamName={}, moduleType={}, moduleName={}, moduleLabel={}", streamName, moduleType, moduleName, moduleLabel);
 
 		Module module = moduleRepository.loadModule(moduleName, Module.Type.valueOf(moduleType.toUpperCase()));
 
-		LOG.info("Loading module from {}", module.getUrl());
+		LOG.debug("Loading module from {}", module.getUrl());
 
 		// todo: this is where we load the module
 
-		String path = Paths.createPath(Paths.STREAMS, streamName, moduleType, moduleName, getId());
+		String streamPath = Paths.build(Paths.STREAMS, streamName, moduleType,
+				String.format("%s.%s", moduleName, moduleLabel), getId());
 
 		try {
 			// this indicates that the container has deployed the module
 			client.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
-					.forPath(path, mapBytesUtility.toByteArray(Collections.singletonMap("state", "deployed")));
+					.forPath(streamPath, mapBytesUtility.toByteArray(Collections.singletonMap("state", "deployed")));
 		}
 		catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -190,16 +226,6 @@ public class ContainerServer extends AbstractServer {
 			LOG.debug("Path cache event: {}", event);
 			switch (event.getType()) {
 				case INITIALIZED:
-					// todo: when the cache is initialized the getInitialData
-					// collection will contain all the children - instead of
-					// issuing a deployment this should perhaps determine
-					// if a deployment is required.
-
-					// For now just (wrongly) assume that everything
-					// should be deployed.
-					for (ChildData data : event.getInitialData()) {
-						onChildAdded(client, data);
-					}
 					break;
 				case CHILD_ADDED:
 					onChildAdded(client, event.getData());

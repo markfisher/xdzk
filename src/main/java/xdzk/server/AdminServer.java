@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.PathChildrenCache;
-import org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent;
 import org.apache.curator.framework.recipes.cache.PathChildrenCacheListener;
 import org.apache.curator.framework.recipes.leader.LeaderSelector;
 import org.apache.curator.framework.recipes.leader.LeaderSelectorListener;
@@ -35,14 +34,12 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.core.convert.converter.Converter;
 
-import xdzk.cluster.ContainerMatcher;
 import xdzk.cluster.ContainerRepository;
-import xdzk.cluster.RandomContainerMatcher;
 import xdzk.cluster.Container;
 import xdzk.core.ModuleRepository;
+import xdzk.core.MapBytesUtility;
 import xdzk.curator.Paths;
 import xdzk.curator.ChildPathIterator;
-import xdzk.core.MapBytesUtility;
 
 /**
  * Prototype implementation of an XD admin server that watches ZooKeeper
@@ -71,19 +68,10 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	private volatile PathChildrenCache containers;
 
 	/**
-	 * Listener implementation that handles container additions and removals.
-	 */
-	private final PathChildrenCacheListener containerListener = new ContainerListener();
-
-	/**
 	 * Cache of children under the streams path. This path is used to track stream
 	 * deployment requests. Marked volatile because this reference is written by
 	 * the Curator thread that handles leader election and read by public
 	 * method {@link #getStreamPaths}.
-	 */
-	/*
-	 * todo: perhaps this does not need to be a member since getStreamPaths
-	 * isn't invoked at the moment
 	 */
 	private volatile PathChildrenCache streams;
 
@@ -99,12 +87,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 * Listener that is invoked when this admin server is elected leader.
 	 */
 	private final LeaderSelectorListener leaderListener = new LeaderListener();
-
-	/**
-	 * Container matcher used to match containers to module deployments.
-	 */
-	// TODO: make this pluggable
-	private final ContainerMatcher containerMatcher = new RandomContainerMatcher();
 
 	/**
 	 * Converter from {@link ChildData} types to {@link xdzk.cluster.Container}.
@@ -176,16 +158,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	}
 
 	/**
-	 * Return the configured {@link xdzk.cluster.ContainerMatcher}. This matcher
-	 * is used to match a container to a module deployment request.
-	 *
-	 * @return container matcher for this admin server
-	 */
-	public ContainerMatcher getContainerMatcher() {
-		return containerMatcher;
-	}
-
-	/**
 	 * {@inheritDoc}
 	 * <p/>
 	 * Upon connection, the admin server starts to listen for containers joining
@@ -203,11 +175,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			Paths.ensurePath(client, Paths.CONTAINERS);
 			Paths.ensurePath(client, Paths.STREAMS);
 
-			containers = new PathChildrenCache(client, Paths.CONTAINERS, true);
-			containers.getListenable().addListener(containerListener);
-			containers.start();
-
-			leaderSelector = new LeaderSelector(client, Paths.createPathWithNamespace(Paths.ADMIN), leaderListener);
+			leaderSelector = new LeaderSelector(client, Paths.buildWithNamespace(Paths.ADMIN), leaderListener);
 			leaderSelector.setId(getId());
 			leaderSelector.start();
 		}
@@ -226,9 +194,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	protected void onDisconnect(ConnectionState newState) {
 		try {
 			leaderSelector.close();
-
-			containers.getListenable().removeListener(containerListener);
-			containers.close();
 		}
 		catch (IllegalStateException e) {
 			// IllegalStateException is thrown if leaderSelector or
@@ -259,7 +224,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			throw new IllegalArgumentException("definition must not be null");
 		}
 		try {
-			getClient().create().forPath(Paths.createPath(Paths.STREAMS, name),
+			getClient().create().forPath(Paths.build(Paths.STREAMS, name),
 					mapBytesUtility.toByteArray(Collections.singletonMap("definition", definition)));
 		}
 		catch (Exception e) {
@@ -283,35 +248,6 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	}
 
 	/**
-	 * Listener implementation that is invoked when containers are added/removed/modified.
-	 */
-	class ContainerListener implements PathChildrenCacheListener {
-
-		@Override
-		public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
-			switch (event.getType()) {
-				case CHILD_ADDED:
-					LOG.info("Container added: {}", Paths.stripPath(event.getData().getPath()));
-					break;
-				case CHILD_UPDATED:
-					LOG.info("Container updated: {}", Paths.stripPath(event.getData().getPath()));
-					break;
-				case CHILD_REMOVED:
-					LOG.info("Container removed: {}", Paths.stripPath(event.getData().getPath()));
-					break;
-				case CONNECTION_SUSPENDED:
-					break;
-				case CONNECTION_RECONNECTED:
-					break;
-				case CONNECTION_LOST:
-					break;
-				case INITIALIZED:
-					break;
-			}
-		}
-	}
-
-	/**
 	 * Listener implementation that is invoked when this server becomes the leader.
 	 */
 	class LeaderListener extends LeaderSelectorListenerAdapter {
@@ -319,13 +255,21 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 		@Override
 		public void takeLeadership(CuratorFramework client) throws Exception {
 			LOG.info("Leader Admin {} is watching for stream deployment requests.", getId());
-			PathChildrenCacheListener streamListener =
-					new StreamListener(AdminServer.this, containerMatcher, moduleRepository);
 
+			PathChildrenCacheListener streamListener = null;
+			PathChildrenCacheListener containerListener = null;
 			try {
+				streamListener = new StreamListener(AdminServer.this, moduleRepository);
+
 				streams = new PathChildrenCache(client, Paths.STREAMS, true);
 				streams.getListenable().addListener(streamListener);
 				streams.start(PathChildrenCache.StartMode.POST_INITIALIZED_EVENT);
+
+				containerListener = new ContainerListener(AdminServer.this, moduleRepository, streams);
+
+				containers = new PathChildrenCache(client, Paths.CONTAINERS, true);
+				containers.getListenable().addListener(containerListener);
+				containers.start();
 
 				Thread.sleep(Long.MAX_VALUE);
 			}
@@ -334,7 +278,14 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 				Thread.currentThread().interrupt();
 			}
 			finally {
-				streams.getListenable().removeListener(streamListener);
+				if (containerListener != null) {
+					containers.getListenable().removeListener(containerListener);
+				}
+				containers.close();
+
+				if (streamListener != null) {
+					streams.getListenable().removeListener(streamListener);
+				}
 				streams.close();
 			}
 		}

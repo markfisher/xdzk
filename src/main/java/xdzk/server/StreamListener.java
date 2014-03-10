@@ -24,11 +24,10 @@ import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import xdzk.cluster.ContainerMatcher;
 import xdzk.cluster.Container;
 import xdzk.cluster.ContainerRepository;
 import xdzk.core.MapBytesUtility;
-import xdzk.core.Module;
+import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
 import xdzk.core.Stream;
 import xdzk.core.StreamFactory;
@@ -55,19 +54,9 @@ public class StreamListener implements PathChildrenCacheListener {
 	private final ContainerRepository containerRepository;
 
 	/**
-	 * Matches a deployment request to a container.
-	 */
-	private final ContainerMatcher matcher;
-
-	/**
 	 * Utility to convert maps to byte arrays.
 	 */
 	private final MapBytesUtility mapBytesUtility = new MapBytesUtility();
-
-	/**
-	 * Module repository.
-	 */
-	private final ModuleRepository moduleRepository;
 
 	/**
 	 * Stream factory.
@@ -78,13 +67,11 @@ public class StreamListener implements PathChildrenCacheListener {
 	/**
 	 * Construct a StreamListener.
 	 *
-	 * @param containerRepository admin server that this listener is attached to
+	 * @param containerRepository repository to obtain container data
+	 * @param moduleRepository    repository to obtain module data
 	 */
-	public StreamListener(ContainerRepository containerRepository, ContainerMatcher matcher,
-						ModuleRepository moduleRepository) {
+	public StreamListener(ContainerRepository containerRepository, ModuleRepository moduleRepository) {
 		this.containerRepository = containerRepository;
-		this.matcher = matcher;
-		this.moduleRepository = moduleRepository;
 		this.streamFactory = new StreamFactory(moduleRepository);
 	}
 
@@ -97,7 +84,7 @@ public class StreamListener implements PathChildrenCacheListener {
 	public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
 		switch (event.getType()) {
 			case CHILD_ADDED:
-				onStreamAdded(client, event.getData());
+				onChildAdded(client, event.getData());
 				break;
 			case CHILD_UPDATED:
 				break;
@@ -128,10 +115,12 @@ public class StreamListener implements PathChildrenCacheListener {
 	 * @param client  curator client
 	 * @param data    stream data
 	 */
-	private void onStreamAdded(CuratorFramework client, ChildData data) {
+	private void onChildAdded(CuratorFramework client, ChildData data) {
 		String streamName = Paths.stripPath(data.getPath());
 		Map<String, String> map = mapBytesUtility.toMap(data.getData());
-		Stream stream = streamFactory.createStream(streamName, map.get("definition"), map);
+		Stream stream = streamFactory.createStream(streamName, map);
+
+		LOG.info("Deploying stream {}", stream);
 
 		try {
 			prepareStream(client, stream);
@@ -141,7 +130,7 @@ public class StreamListener implements PathChildrenCacheListener {
 			Thread.currentThread().interrupt();
 		}
 		catch (Exception e) {
-			throw new RuntimeException(e);
+			throw e instanceof RuntimeException ? ((RuntimeException) e) : new RuntimeException(e);
 		}
 	}
 
@@ -149,10 +138,9 @@ public class StreamListener implements PathChildrenCacheListener {
 	 * Prepare the new stream for deployment. This updates the ZooKeeper znode
 	 * for the stream by adding the following under {@code /xd/streams/[stream-name]}:
 	 * <ul>
-	 *     <li>{@code .../source/[module-name]}</li>
-	 *     <li>{@code .../processor0/[module-name]}</li>
-	 *     <li>{@code .../processor1/[module-name]}</li>
-	 *     <li>{@code .../sink/[module-name]}</li>
+	 *     <li>{@code .../source/[module-name.module-label]}</li>
+	 *     <li>{@code .../processor/[module-name.module-label]}</li>
+	 *     <li>{@code .../sink/[module-name.module-label]}</li>
 	 * </ul>
 	 * The children of these nodes will be ephemeral nodes written by the containers
 	 * that accept deployment of the modules.
@@ -161,18 +149,18 @@ public class StreamListener implements PathChildrenCacheListener {
 	 * @param stream  stream to be prepared
 	 */
 	private void prepareStream(CuratorFramework client, Stream stream) throws Exception {
-		// todo: hacking in a "default" set of attributes for the module; these
-		// should come from the stream deployment manifest
-		Map<String, String> moduleAttributes = new HashMap<String, String>();
-		moduleAttributes.put("count", "1");  // only deploy one instance of the module
+		for (Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator(); iterator.hasNext();) {
+			ModuleDescriptor module = iterator.next();
+			String streamName = stream.getName();
+			String moduleType = module.getModule().getType().toString();
+			String moduleName = module.getModule().getName();
+			String moduleLabel = module.getLabel();
 
-		for (Iterator<Module> iterator = stream.getDeploymentOrderIterator(); iterator.hasNext();) {
-			Module module = iterator.next();
-			// TODO: the processors MUST be ordered! They are not right now
-			String path = Paths.createPath(Paths.STREAMS, stream.getName(), module.getType().toString(), module.getName());
+			String path = Paths.build(Paths.STREAMS, streamName,
+					moduleType, String.format("%s.%s", moduleName, moduleLabel));
 
 			try {
-				client.create().creatingParentsIfNeeded().forPath(path, mapBytesUtility.toByteArray(moduleAttributes));
+				client.create().creatingParentsIfNeeded().forPath(path);
 			}
 			catch (KeeperException.NodeExistsException e) {
 				// todo: this would be somewhat unexpected
@@ -190,56 +178,52 @@ public class StreamListener implements PathChildrenCacheListener {
 	 * @throws Exception
 	 */
 	private void deployStream(CuratorFramework client, Stream stream) throws Exception {
-		for (Iterator<Module> iterator = stream.getDeploymentOrderIterator(); iterator.hasNext();) {
-			Module module = iterator.next();
-
-			Container container = matcher.match(module, containerRepository);
-			if (container == null) {
-				LOG.warn("No container available to deploy module {}", module);
-				return;
-			}
-
-			LOG.info("Deploying module '{}' to container: {}", module, container);
-
+		for (Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator(); iterator.hasNext();) {
+			ModuleDescriptor module = iterator.next();
 			String streamName = stream.getName();
-			String moduleType = module.getType().toString();
-			String moduleName = module.getName();
-			String containerName = container.getName();
+			String moduleType = module.getModule().getType().toString();
+			String moduleName = module.getModule().getName();
+			String moduleLabel = module.getLabel();
+			Map<Container, String> mapDeploymentStatus = new HashMap<Container, String>();
 
-			Map<String, String> attributes = new HashMap<String, String>();
-			attributes.put("stream", streamName);
-			attributes.put("type", moduleType);
+			for (Container container : stream.getContainerMatcher().match(module, containerRepository)) {
+				String containerName = container.getName();
+				try {
+					client.create().creatingParentsIfNeeded().forPath(
+							Paths.build(Paths.DEPLOYMENTS, containerName,
+									String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
 
-			try {
-				client.create().creatingParentsIfNeeded().forPath(
-						Paths.createPath(Paths.DEPLOYMENTS, containerName, moduleName),
-						mapBytesUtility.toByteArray(attributes));
-
-				String deploymentStatusPath =
-						Paths.createPath(Paths.STREAMS, streamName, moduleType, moduleName, containerName);
-
-				// ensure that the container accepts the module deployment before moving
-				// on to the next deployment
-
-				// todo: make timeout configurable
-				long timeout = System.currentTimeMillis() + 5000;
-				boolean deployed;
-				do {
-					Thread.sleep(10);
-					deployed = client.checkExists().forPath(deploymentStatusPath) != null;
+					mapDeploymentStatus.put(container,
+							Paths.build(Paths.STREAMS, streamName, moduleType,
+									String.format("%s.%s", moduleName, moduleLabel), containerName));
 				}
-				while (!deployed && System.currentTimeMillis() < timeout);
-
-				if (!deployed) {
-					// todo: if the container went away we should select another one to deploy to;
-					// otherwise this reflects a bug in the container or some kind of network
-					// error in which case the state of deployment is "unknown"
-					throw new IllegalStateException(String.format("Deployment of module %s to container %s timed out",
-							moduleName, containerName));
+				catch (KeeperException.NodeExistsException e) {
+					LOG.info("Module {} is already deployed to container {}", module, container);
 				}
 			}
-			catch (KeeperException.NodeExistsException e) {
-				LOG.info("Module {} is already deployed to container {}", module, container);
+
+			// wait for all deployments to succeed
+			// todo: make timeout configurable
+			long timeout = System.currentTimeMillis() + 30000;
+			do {
+				for (Iterator<Map.Entry<Container, String>> iteratorStatus = mapDeploymentStatus.entrySet().iterator();
+					 iteratorStatus.hasNext();) {
+					Map.Entry<Container, String> entry = iteratorStatus.next();
+					if (client.checkExists().forPath(entry.getValue()) != null) {
+						iteratorStatus.remove();
+					}
+					Thread.sleep(10);
+				}
+			}
+			while (!mapDeploymentStatus.isEmpty() && System.currentTimeMillis() < timeout);
+
+			if (!mapDeploymentStatus.isEmpty()) {
+				// todo: if the container went away we should select another one to deploy to;
+				// otherwise this reflects a bug in the container or some kind of network
+				// error in which case the state of deployment is "unknown"
+				throw new IllegalStateException(String.format(
+						"Deployment of module %s to the following containers timed out: %s",
+						moduleName, mapDeploymentStatus.keySet()));
 			}
 		}
 	}

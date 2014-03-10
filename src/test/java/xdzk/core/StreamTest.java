@@ -18,6 +18,7 @@ package xdzk.core;
 
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -31,16 +32,16 @@ public class StreamTest {
 	public void testSimpleStream() {
 		ModuleRepository moduleRepository = new StubModuleRepository();
 		StreamFactory streamFactory = new StreamFactory(moduleRepository);
-		Stream stream = streamFactory.createStream("ticktock", "time | log", null);
+		Stream stream = streamFactory.createStream("ticktock", Collections.singletonMap("definition", "time | log"));
 
 		assertEquals("ticktock", stream.getName());
-		Iterator<Module> iterator = stream.getDeploymentOrderIterator();
+		Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator();
 		assertTrue(iterator.hasNext());
 
 		String[] moduleNames = {"log", "time"};
 		for (String moduleName : moduleNames) {
-			Module module = iterator.next();
-			assertEquals(moduleName, module.getName());
+			ModuleDescriptor descriptor = iterator.next();
+			assertEquals(moduleName, descriptor.getModule().getName());
 		}
 
 		assertFalse(iterator.hasNext());
@@ -58,17 +59,17 @@ public class StreamTest {
 	public void testProcessorStream() {
 		ModuleRepository moduleRepository = new StubModuleRepository();
 		StreamFactory streamFactory = new StreamFactory(moduleRepository);
-
-		Stream stream = streamFactory.createStream("fancy-http", "http | transform | filter | log", null);
+		Stream stream = streamFactory.createStream("fancy-http",
+				Collections.singletonMap("definition", "http | transform | filter | log"));
 
 		assertEquals("fancy-http", stream.getName());
-		Iterator<Module> iterator = stream.getDeploymentOrderIterator();
+		Iterator<ModuleDescriptor> iterator = stream.getDeploymentOrderIterator();
 		assertTrue(iterator.hasNext());
 
 		String[] moduleNames = {"log", "filter", "transform", "http"};
 		for (String moduleName : moduleNames) {
-			Module module = iterator.next();
-			assertEquals(moduleName, module.getName());
+			ModuleDescriptor descriptor = iterator.next();
+			assertEquals(moduleName, descriptor.getModule().getName());
 		}
 
 		assertFalse(iterator.hasNext());

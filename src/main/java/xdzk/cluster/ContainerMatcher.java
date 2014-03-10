@@ -16,7 +16,9 @@
 
 package xdzk.cluster;
 
-import xdzk.core.Module;
+import xdzk.core.ModuleDescriptor;
+
+import java.util.Collection;
 
 
 /**
@@ -30,15 +32,13 @@ public interface ContainerMatcher {
 	 * Matches the provided module against one of the candidate containers.
 	 *
 	 *
-	 * @param module
-	 * @param containerRepository
-	 * @return the matched container, or <code>null</code> if no suitable match
+	 * @param moduleDescriptor                the module to match against
+	 * @param containerRepository   the container repository that provides the
+	 *                              ability to look up containers
+	 *
+	 * @return a collection of matched containers; collection is empty if no
+	 *         suitable containers are found
 	 */
-	// TODO: The module name should be replaced with ModuleDeploymentRequest which will
-	// include the criteria for matching against container attributes as well as other
-	// metadata extracted from the stream deployment manifest, such as the number of instances.
-	// Also, the String return and collection element type should be Container instances
-	// where ultimately matching will take Container attributes and metrics into consideration.
-	Container match(Module module, ContainerRepository containerRepository);
+	Collection<Container> match(ModuleDescriptor moduleDescriptor, ContainerRepository containerRepository);
 
 }

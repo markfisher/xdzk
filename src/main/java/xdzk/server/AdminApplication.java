@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -109,17 +108,17 @@ public class AdminApplication {
 	/**
 	 * Application lifecycle listener.
 	 */
-	public static class AdminApplicationListener implements ApplicationListener {
+	public static class AdminApplicationListener implements ApplicationListener<ContextRefreshedEvent> {
 
 		@Override
-		public void onApplicationEvent(ApplicationEvent event) {
+		public void onApplicationEvent(ContextRefreshedEvent event) {
 			LOG.trace("Application event: {}", event);
 
-			if (event instanceof ContextRefreshedEvent) {
-				// if the application context is used before refresh
-				// an IllegalStateException is thrown; therefore
-				// don't hold the application context until the first refresh
-				applicationContext = (ApplicationContext) event.getSource();
+			// if the application context is used before refresh
+			// an IllegalStateException is thrown; therefore
+			// don't hold the application context until the first refresh
+			if (applicationContext == null) {
+				applicationContext = event.getApplicationContext();
 			}
 		}
 	}

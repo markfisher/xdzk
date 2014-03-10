@@ -17,11 +17,14 @@
 package xdzk.core;
 
 import org.springframework.util.Assert;
+import xdzk.cluster.ContainerMatcher;
+import xdzk.cluster.DeploymentManifestMatcher;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -43,20 +46,27 @@ public class Stream {
 	 * Source module for this stream. This module is responsible for
 	 * obtaining data for this stream.
 	 */
-	private final Module source;
+	private final ModuleDescriptor source;
 
 	/**
 	 * Ordered list of processor modules. The data obtained by
 	 * the source module will be fed to these processors in the order
 	 * indicated by this list.
 	 */
-	private final List<Module> processors;
+	private final List<ModuleDescriptor> processors;
 
 	/**
 	 * Sink module for this stream. This is the ultimate destination
 	 * for the stream data.
 	 */
-	private final Module sink;
+	private final ModuleDescriptor sink;
+
+	/**
+	 * Container matcher for this stream. This is used by the stream
+	 * to indicate which container(s) should deploy the various
+	 * modules in the stream.
+	 */
+	private final ContainerMatcher containerMatcher;
 
 	/**
 	 * Properties for this stream.
@@ -72,14 +82,19 @@ public class Stream {
 	 * @param sink        sink module
 	 * @param properties  stream properties
 	 */
-	private Stream(String name, Module source, List<Module> processors,
-				Module sink, Map<String, String> properties) {
+	private Stream(String name, ModuleDescriptor source, List<ModuleDescriptor> processors,
+				ModuleDescriptor sink, ContainerMatcher containerMatcher, Map<String, String> properties) {
 		this.name = name;
 		this.source = source;
-		this.processors = new LinkedList<Module>(processors == null ? Collections.<Module>emptyList() : processors);
+		this.processors = new LinkedList<ModuleDescriptor>(processors == null
+				? Collections.<ModuleDescriptor>emptyList()
+				: processors);
 		this.sink = sink;
+		this.containerMatcher = containerMatcher;
 		this.properties = properties;
 	}
+
+
 
 	/**
 	 * Return the name of this stream.
@@ -95,7 +110,7 @@ public class Stream {
 	 *
 	 * @return source module
 	 */
-	public Module getSource() {
+	public ModuleDescriptor getSource() {
 		return source;
 	}
 
@@ -104,7 +119,7 @@ public class Stream {
 	 *
 	 * @return list of processors
 	 */
-	public List<Module> getProcessors() {
+	public List<ModuleDescriptor> getProcessors() {
 		return Collections.unmodifiableList(processors);
 	}
 
@@ -113,8 +128,17 @@ public class Stream {
 	 *
 	 * @return sink module
 	 */
-	public Module getSink() {
+	public ModuleDescriptor getSink() {
 		return sink;
+	}
+
+	/**
+	 * Return the container matcher for this stream.
+	 *
+	 * @return container matcher
+	 */
+	public ContainerMatcher getContainerMatcher() {
+		return containerMatcher;
 	}
 
 	/**
@@ -125,7 +149,7 @@ public class Stream {
 	 *
 	 * @return iterator that iterates over the modules in deployment order
 	 */
-	public Iterator<Module> getDeploymentOrderIterator() {
+	public Iterator<ModuleDescriptor> getDeploymentOrderIterator() {
 		return new DeploymentOrderIterator();
 	}
 
@@ -139,6 +163,41 @@ public class Stream {
 	}
 
 	/**
+	 * Return the module descriptor for the given module name and type.
+	 *
+	 * @param moduleName  module name
+	 * @param moduleType  module type
+	 *
+	 * @return module descriptor
+	 *
+	 * @throws IllegalArgumentException if the module name/type cannot be found
+	 */
+	public ModuleDescriptor getModuleDescriptor(String moduleName, String moduleType) {
+		Module.Type type = Module.Type.valueOf(moduleType.toUpperCase());
+		ModuleDescriptor moduleDescriptor = null;
+		switch (type) {
+			case SOURCE:
+				moduleDescriptor = getSource();
+				break;
+			case SINK:
+				moduleDescriptor = getSink();
+				break;
+			case PROCESSOR:
+				for (ModuleDescriptor processor : processors) {
+					if (processor.getModule().getName().equals(moduleName)) {
+						moduleDescriptor = processor;
+						break;
+					}
+				}
+		}
+		if (moduleDescriptor == null || !moduleName.equals(moduleDescriptor.getModule().getName())) {
+			throw new IllegalArgumentException(String.format("Module %s of type %s not found", moduleName, moduleType));
+		}
+
+		return moduleDescriptor;
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
@@ -148,7 +207,6 @@ public class Stream {
 				", source=" + source +
 				", processors=" + processors +
 				", sink=" + sink +
-				", properties=" + properties +
 				'}';
 	}
 
@@ -182,7 +240,7 @@ public class Stream {
 	 * first, followed by processor modules in reverse order,
 	 * followed by the source module.
 	 */
-	class DeploymentOrderIterator implements Iterator<Module> {
+	class DeploymentOrderIterator implements Iterator<ModuleDescriptor> {
 		/**
 		 * Iterator state.
 		 */
@@ -191,7 +249,7 @@ public class Stream {
 		/**
 		 * Iterator over the processor modules.
 		 */
-		private final Iterator<Module> processorIterator;
+		private final Iterator<ModuleDescriptor> processorIterator;
 
 		/**
 		 * Construct a DeploymentOrderIterator.
@@ -215,7 +273,7 @@ public class Stream {
 		 * {@inheritDoc}
 		 */
 		@Override
-		public Module next() {
+		public ModuleDescriptor next() {
 			switch(state) {
 				case INITIAL:
 					state = IteratorState.PROC_ITERATOR_ACTIVE;
@@ -256,24 +314,19 @@ public class Stream {
 		private String name;
 
 		/**
-		 * Source module.
+		 * Map of module labels to modules.
 		 */
-		private Module source;
+		private Map<String, Module> modules = new LinkedHashMap<String, Module>();
 
 		/**
-		 * List of processor modules.
+		 * Container matcher. Defaults to {@link DeploymentManifestMatcher}.
 		 */
-		private List<Module> processors = new ArrayList<Module>();
-
-		/**
-		 * Sink module.
-		 */
-		private Module sink;
+		private ContainerMatcher containerMatcher = new DeploymentManifestMatcher();
 
 		/**
 		 * Stream properties
 		 */
-		private Map<String, String> properties;
+		private Map<String, String> properties = Collections.emptyMap();
 
 		/**
 		 * Set the stream name.
@@ -292,23 +345,15 @@ public class Stream {
 		 * modules will be added to the stream in the order
 		 * they are added to this builder.
 		 *
-		 * @param module module to add
-		 *
+		 * @param module  module to add
+		 * @param label   label for this module
 		 * @return this builder
 		 */
-		public Builder addModule(Module module) {
-			switch (module.getType()) {
-				case SOURCE:
-					source = module;
-					break;
-				case PROCESSOR:
-					processors.add(module);
-					break;
-				case SINK:
-					sink = module;
-					break;
+		public Builder addModule(Module module, String label) {
+			if (modules.containsKey(label)) {
+				throw new IllegalArgumentException(String.format("Label %s already in use", label));
 			}
-
+			modules.put(label, module);
 			return this;
 		}
 
@@ -330,7 +375,50 @@ public class Stream {
 		 * @return new Stream instance
 		 */
 		public Stream build() {
-			return new Stream(name, source, processors, sink, properties);
+			ModuleDescriptor sourceDescriptor = null;
+			ModuleDescriptor sinkDescriptor = null;
+			List<ModuleDescriptor> processorDescriptors = new ArrayList<ModuleDescriptor>();
+			int i = 0;
+
+			for (Map.Entry<String, Module> entry : modules.entrySet()) {
+				String label = entry.getKey();
+				Module module = entry.getValue();
+				String group = properties.get(String.format("module.%s.group", module.getName()));
+				int count = convert(properties.get(String.format("module.%s.count", module.getName())));
+
+				ModuleDescriptor descriptor = new ModuleDescriptor(module, name, label, i++, group, count);
+				switch (module.getType()) {
+					case SOURCE:
+						sourceDescriptor = descriptor;
+						break;
+					case PROCESSOR:
+						processorDescriptors.add(descriptor);
+						break;
+					case SINK:
+						sinkDescriptor = descriptor;
+				}
+			}
+
+			Assert.notNull(sourceDescriptor);
+			Assert.notNull(sinkDescriptor);
+
+			// TODO: if the manifest includes a container matcher, an instance should
+			// be obtained and passed along to the constructor. Perhaps this can
+			// be loaded from an application context?
+			//String matcher = properties.get("matcher");
+
+			return new Stream(name, sourceDescriptor, processorDescriptors, sinkDescriptor, containerMatcher, properties);
+		}
+
+		/**
+		 * Convert a String value to an int. Returns 1 if the String is null.
+		 *
+		 * @param s string to convert
+		 *
+		 * @return int value of String, or 1 if null
+		 */
+		private int convert(String s) {
+			return s == null ? 1 : Integer.valueOf(s);
 		}
 	}
 
