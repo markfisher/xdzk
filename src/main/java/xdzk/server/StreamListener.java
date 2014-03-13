@@ -35,6 +35,7 @@ import xdzk.curator.Paths;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -89,8 +90,8 @@ public class StreamListener implements PathChildrenCacheListener {
 			case CHILD_UPDATED:
 				break;
 			case CHILD_REMOVED:
-				LOG.info("Stream removed: {}", Paths.stripPath(event.getData().getPath()));
-				// todo: what to do when stream is removed?
+				onChildDeleted(client, event.getData());
+				break;
 			case CONNECTION_SUSPENDED:
 				break;
 			case CONNECTION_RECONNECTED:
@@ -102,11 +103,26 @@ public class StreamListener implements PathChildrenCacheListener {
 				// when this admin is first elected leader and there are
 				// streams, it needs to verify that the streams have been
 				// deployed
-				for (ChildData childData : event.getInitialData()) {
-					LOG.info("Existing stream: {}", Paths.stripPath(childData.getPath()));
-				}
+//				for (ChildData childData : event.getInitialData()) {
+//					LOG.info("Existing stream: {}", Paths.stripPath(childData.getPath()));
+//				}
 				break;
 		}
+	}
+
+	private void onChildDeleted(CuratorFramework client, ChildData data) throws Exception {
+		String streamName = Paths.stripPath(data.getPath());
+		LOG.info("Stream removed: {}", streamName);
+
+		// todo: review
+		// each container will be responsible for removing its own portion
+		// of the stream...perhaps there won't be anything for the admin
+		// to do in this case
+
+//		Map<String, String> map = mapBytesUtility.toMap(data.getData());
+//		Stream stream = streamFactory.createStream(streamName, map);
+//
+//		LOG.info("Stream object: {}", stream);
 	}
 
 	/**

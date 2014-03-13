@@ -43,6 +43,11 @@ public class Stream {
 	private final String name;
 
 	/**
+	 * Stream definition.
+	 */
+	private final String definition;
+
+	/**
 	 * Source module for this stream. This module is responsible for
 	 * obtaining data for this stream.
 	 */
@@ -92,9 +97,9 @@ public class Stream {
 		this.sink = sink;
 		this.containerMatcher = containerMatcher;
 		this.properties = properties;
+		this.definition = properties.get("definition");
+		Assert.hasText(this.definition, "Stream properties require a 'definition' value");
 	}
-
-
 
 	/**
 	 * Return the name of this stream.
@@ -204,10 +209,8 @@ public class Stream {
 	public String toString() {
 		return "Stream{" +
 				"name='" + name + '\'' +
-				", source=" + source +
-				", processors=" + processors +
-				", sink=" + sink +
-				'}';
+				", definition='" + definition +
+				"'}";
 	}
 
 	/**
