@@ -175,7 +175,7 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 			Paths.ensurePath(client, Paths.CONTAINERS);
 			Paths.ensurePath(client, Paths.STREAMS);
 
-			leaderSelector = new LeaderSelector(client, Paths.buildWithNamespace(Paths.ADMIN), leaderListener);
+			leaderSelector = new LeaderSelector(client, Paths.build(Paths.ADMIN), leaderListener);
 			leaderSelector.setId(getId());
 			leaderSelector.start();
 		}

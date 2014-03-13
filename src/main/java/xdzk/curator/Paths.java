@@ -83,6 +83,7 @@ public class Paths {
 	 */
 	public static String build(String... elements) {
 		StringBuilder builder = new StringBuilder();
+		builder.append('/');
 		for (int i = 0; i < elements.length; i++) {
 			builder.append(elements[i]);
 			if (i + 1 < elements.length) {
@@ -103,7 +104,7 @@ public class Paths {
 	 * @return the full path
 	 */
 	public static String buildWithNamespace(String... elements) {
-		return '/' + XD_NAMESPACE + '/' + build(elements);
+		return '/' + XD_NAMESPACE + build(elements);
 	}
 
 	/**
