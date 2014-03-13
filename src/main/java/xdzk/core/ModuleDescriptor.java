@@ -16,6 +16,8 @@
 
 package xdzk.core;
 
+import org.springframework.util.Assert;
+
 /**
  * A descriptor for module deployment for a specific {@link Stream}.
  * Many attributes of this class are derived from the stream deployment manifest.
@@ -132,10 +134,117 @@ public class ModuleDescriptor {
 	}
 
 	/**
+	 * Create a new {@link Key} based on this ModuleDescriptor.
+	 *
+	 * @return key that can be used to refer to this object
+	 */
+	public Key newKey() {
+		return new Key(module.getType(), label);
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
 	public String toString() {
 		return String.format("%s: %s type=%s, group=%s", label, module.getName(), module.getType(), group);
+	}
+
+
+	/**
+	 * Key class that can be used to refer to a {@link ModuleDescriptor}.
+	 * It can be used as a key in a map, both hash and tree based.
+	 */
+	public static class Key implements Comparable<Key> {
+		/**
+		 * Module type.
+		 */
+		private final Module.Type type;
+
+		/**
+		 * Module label.
+		 */
+		private final String label;
+
+		/**
+		 * Construct a key.
+		 *
+		 * @param type   module type
+		 * @param label  module label
+		 */
+		public Key(Module.Type type, String label) {
+			Assert.notNull(type, "Type is required");
+			Assert.hasText(label, "Label is required");
+			this.type = type;
+			this.label = label;
+		}
+
+		/**
+		 * Return the module type.
+		 *
+		 * @return module type
+		 */
+		public Module.Type getType() {
+			return type;
+		}
+
+		/**
+		 * Return the module label.
+		 *
+		 * @return module label
+		 */
+		public String getLabel() {
+			return label;
+		}
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public int compareTo(Key other) {
+			int c = type.compareTo(other.getType());
+			if (c == 0) {
+				c = label.compareTo(other.getLabel());
+			}
+			return c;
+		}
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) {
+				return true;
+			}
+
+			if (o instanceof Key) {
+				Key other = (Key) o;
+				return type.equals(other.getType()) && label.equals(other.getLabel());
+			}
+
+			return false;
+		}
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public int hashCode() {
+			int result = type.hashCode();
+			result = 31 * result + label.hashCode();
+			return result;
+		}
+
+		/**
+		 * {@inheritDoc}
+		 */
+		@Override
+		public String toString() {
+			return "Key{" +
+					"type=" + type +
+					", label='" + label + '\'' +
+					'}';
+		}
 	}
 }

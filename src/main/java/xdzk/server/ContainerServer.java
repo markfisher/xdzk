@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.api.CuratorWatcher;
@@ -43,7 +44,10 @@ import org.springframework.util.StringUtils;
 
 import xdzk.core.MapBytesUtility;
 import xdzk.core.Module;
+import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
+import xdzk.core.Stream;
+import xdzk.core.StreamFactory;
 import xdzk.curator.Paths;
 
 /**
@@ -88,6 +92,17 @@ public class ContainerServer extends AbstractServer {
 	private final ModuleRepository moduleRepository;
 
 	/**
+	 * Stream factory.
+	 */
+	private final StreamFactory streamFactory;
+
+	/**
+	 * Map of deployed modules.
+	 */
+	private final Map<ModuleDescriptor.Key, ModuleDescriptor> mapDeployedModules =
+			new ConcurrentHashMap<ModuleDescriptor.Key, ModuleDescriptor>();
+
+	/**
 	 * The set of groups this container belongs to.
 	 */
 	private final Set<String> groups;
@@ -110,6 +125,7 @@ public class ContainerServer extends AbstractServer {
 		}
 		this.mapBytesUtility = mapBytesUtility;
 		this.moduleRepository = moduleRepository;
+		this.streamFactory = new StreamFactory(moduleRepository); // todo: this should be injected
 	}
 
 	/**
@@ -117,13 +133,11 @@ public class ContainerServer extends AbstractServer {
 	 * </p>
 	 * TODO: this is a placeholder
 	 *
-	 * @param moduleName  module name
-	 * @param moduleType  module type
+	 * @param moduleDescriptor
 	 */
-	protected void deployModule(String moduleName, String moduleType) {
-		Module module = moduleRepository.loadModule(moduleName, Module.Type.valueOf(moduleType.toUpperCase()));
-
-		LOG.debug("Loading module from {}", module.getUrl());
+	private void deployModule(ModuleDescriptor moduleDescriptor) {
+		LOG.info("Deploying module {}", moduleDescriptor);
+		mapDeployedModules.put(moduleDescriptor.newKey(), moduleDescriptor);
 	}
 
 	/**
@@ -131,11 +145,19 @@ public class ContainerServer extends AbstractServer {
 	 * </p>
 	 * TODO: this is a placeholder
 	 *
-	 * @param moduleName  module name
-	 * @param moduleType  module type
+	 * @param moduleLabel  module label
+	 * @param moduleType   module type
 	 */
-	protected void undeployModule(String moduleName, String moduleType) {
-		LOG.info("Undeploying module {}", moduleName);
+	protected void undeployModule(String moduleLabel, String moduleType) {
+		ModuleDescriptor.Key key = new ModuleDescriptor.Key(Module.Type.valueOf(moduleType.toUpperCase()), moduleLabel);
+		ModuleDescriptor descriptor = mapDeployedModules.get(key);
+		if (descriptor == null) {
+			LOG.info("Module {} already undeployed", moduleLabel);
+		}
+		else {
+			LOG.info("Undeploying module {}", descriptor);
+			mapDeployedModules.remove(key);
+		}
 	}
 
 	/**
@@ -223,7 +245,10 @@ public class ContainerServer extends AbstractServer {
 				String.format("%s.%s", moduleName, moduleLabel), getId());
 
 		try {
-			deployModule(moduleName, moduleType);
+			Stream stream = streamFactory.createStream(streamName,
+					mapBytesUtility.toMap(client.getData().forPath(Paths.build(Paths.STREAMS, streamName))));
+
+			deployModule(stream.getModuleDescriptor(moduleName, moduleType));
 
 			// this indicates that the container has deployed the module
 			client.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
@@ -275,7 +300,7 @@ public class ContainerServer extends AbstractServer {
 				String moduleType = pathElements[3];
 				String moduleName = pathElements[4].split("\\.")[0];
 				String moduleLabel = pathElements[4].split("\\.")[1];
-				undeployModule(moduleName, moduleType);
+				undeployModule(moduleLabel, moduleType);
 
 				String deploymentPath = Paths.build(Paths.DEPLOYMENTS, getId(),
 						String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel));

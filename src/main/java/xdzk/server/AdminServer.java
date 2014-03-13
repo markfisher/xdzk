@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.util.Assert;
 
 import xdzk.cluster.ContainerRepository;
 import xdzk.cluster.Container;
@@ -216,13 +217,9 @@ public class AdminServer extends AbstractServer implements ContainerRepository {
 	 * @param definition  stream definition (pipe delimited list of modules)
 	 */
 	public void handleStreamDeployment(String name, String definition) {
-		// TODO: improve parameter validation
-		if (name == null) {
-			throw new IllegalArgumentException("name must not be null");
-		}
-		if (definition == null) {
-			throw new IllegalArgumentException("definition must not be null");
-		}
+		Assert.hasText(name, "name required");
+		Assert.hasText(definition, "definition required");
+
 		try {
 			getClient().create().forPath(Paths.build(Paths.STREAMS, name),
 					mapBytesUtility.toByteArray(Collections.singletonMap("definition", definition)));
