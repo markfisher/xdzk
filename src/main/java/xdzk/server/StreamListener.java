@@ -31,11 +31,11 @@ import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
 import xdzk.core.Stream;
 import xdzk.core.StreamFactory;
+import xdzk.core.StreamsPath;
 import xdzk.curator.Paths;
 
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -172,8 +172,10 @@ public class StreamListener implements PathChildrenCacheListener {
 			String moduleName = module.getModule().getName();
 			String moduleLabel = module.getLabel();
 
-			String path = Paths.build(Paths.STREAMS, streamName,
-					moduleType, String.format("%s.%s", moduleName, moduleLabel));
+			String path = new StreamsPath()
+					.setStreamName(streamName)
+					.setModuleType(moduleType)
+					.setModuleLabel(moduleLabel).build();
 
 			try {
 				client.create().creatingParentsIfNeeded().forPath(path);
@@ -209,9 +211,11 @@ public class StreamListener implements PathChildrenCacheListener {
 							Paths.build(Paths.DEPLOYMENTS, containerName,
 									String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
 
-					mapDeploymentStatus.put(container,
-							Paths.build(Paths.STREAMS, streamName, moduleType,
-									String.format("%s.%s", moduleName, moduleLabel), containerName));
+					mapDeploymentStatus.put(container, new StreamsPath()
+							.setStreamName(streamName)
+							.setModuleType(moduleType)
+							.setModuleLabel(moduleLabel)
+							.setContainer(containerName).build());
 				}
 				catch (KeeperException.NodeExistsException e) {
 					LOG.info("Module {} is already deployed to container {}", module, container);

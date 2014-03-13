@@ -32,6 +32,7 @@ import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
 import xdzk.core.Stream;
 import xdzk.core.StreamFactory;
+import xdzk.core.StreamsPath;
 import xdzk.curator.ChildPathIterator;
 import xdzk.curator.Paths;
 
@@ -145,9 +146,10 @@ public class ContainerListener implements PathChildrenCacheListener {
 					String moduleLabel = descriptor.getLabel();
 
 					// obtain all of the containers that have deployed this module
-					String streamPath = Paths.build(Paths.STREAMS, streamName, moduleType,
-							String.format("%s.%s", moduleName, moduleLabel));
-					List<String> containersForModule = client.getChildren().forPath(streamPath);
+					List<String> containersForModule = client.getChildren().forPath(new StreamsPath()
+							.setStreamName(streamName)
+							.setModuleType(moduleType)
+							.setModuleLabel(moduleLabel).build());
 					if (!containersForModule.contains(containerName)) {
 						// this container has not deployed this module; determine if it should
 						int moduleCount = descriptor.getCount();

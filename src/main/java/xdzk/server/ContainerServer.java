@@ -48,6 +48,7 @@ import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
 import xdzk.core.Stream;
 import xdzk.core.StreamFactory;
+import xdzk.core.StreamsPath;
 import xdzk.curator.Paths;
 
 /**
@@ -231,6 +232,7 @@ public class ContainerServer extends AbstractServer {
 	 * @param data    module data
 	 */
 	private void onChildAdded(CuratorFramework client, ChildData data) {
+		// todo: replace with DeploymentsPath
 		String deployment = Paths.stripPath(data.getPath());
 		String[] split = deployment.split("\\.");
 		String streamName = split[0];
@@ -241,8 +243,10 @@ public class ContainerServer extends AbstractServer {
 		LOG.info("Deploying module '{}' for stream '{}'", moduleName, streamName);
 		LOG.debug("streamName={}, moduleType={}, moduleName={}, moduleLabel={}", streamName, moduleType, moduleName, moduleLabel);
 
-		String streamPath = Paths.build(Paths.STREAMS, streamName, moduleType,
-				String.format("%s.%s", moduleName, moduleLabel), getId());
+		String streamPath = new StreamsPath().setStreamName(streamName)
+				.setModuleType(moduleType)
+				.setModuleLabel(moduleLabel)
+				.setContainer(getId()).build();
 
 		try {
 			Stream stream = streamFactory.createStream(streamName,
@@ -294,20 +298,22 @@ public class ContainerServer extends AbstractServer {
 		@Override
 		public void process(WatchedEvent event) throws Exception {
 			if (event.getType() == Watcher.Event.EventType.NodeDeleted) {
-				// todo: we really need some kind of utility to do this path stuff
-				String[] pathElements = event.getPath().split("\\/");
-				String streamName = pathElements[2];
-				String moduleType = pathElements[3];
-				String moduleName = pathElements[4].split("\\.")[0];
-				String moduleLabel = pathElements[4].split("\\.")[1];
+				StreamsPath streamsPath = new StreamsPath(event.getPath());
+
+				String streamName = streamsPath.getStreamName();
+				String moduleType = streamsPath.getModuleType();
+//				String moduleName = streamsPath.get
+				String moduleLabel = streamsPath.getModuleLabel();
+
 				undeployModule(moduleLabel, moduleType);
 
-				String deploymentPath = Paths.build(Paths.DEPLOYMENTS, getId(),
-						String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel));
+				// todo: remove the deployment path once we remove module name from deployments
+//				String deploymentPath = Paths.build(Paths.DEPLOYMENTS, getId(),
+//						String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel));
+//
+//				LOG.trace("Deleting path: {}",  deploymentPath);
 
-				LOG.trace("Deleting path: {}",  deploymentPath);
-
-				getClient().delete().forPath(deploymentPath);
+//				getClient().delete().forPath(deploymentPath);
 			}
 			else {
 				// this watcher is only interested in deletes for the purposes
