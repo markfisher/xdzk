@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.util.StringUtils;
 
+import xdzk.core.DeploymentsPath;
 import xdzk.core.MapBytesUtility;
 import xdzk.core.Module;
 import xdzk.core.ModuleDescriptor;
@@ -232,16 +233,12 @@ public class ContainerServer extends AbstractServer {
 	 * @param data    module data
 	 */
 	private void onChildAdded(CuratorFramework client, ChildData data) {
-		// todo: replace with DeploymentsPath
-		String deployment = Paths.stripPath(data.getPath());
-		String[] split = deployment.split("\\.");
-		String streamName = split[0];
-		String moduleType = split[1];
-		String moduleName = split[2];
-		String moduleLabel = split[3];
+		DeploymentsPath deploymentsPath = new DeploymentsPath(data.getPath());
+		String streamName = deploymentsPath.getStreamName();
+		String moduleType = deploymentsPath.getModuleType();
+		String moduleLabel = deploymentsPath.getModuleLabel();
 
-		LOG.info("Deploying module '{}' for stream '{}'", moduleName, streamName);
-		LOG.debug("streamName={}, moduleType={}, moduleName={}, moduleLabel={}", streamName, moduleType, moduleName, moduleLabel);
+		LOG.info("Deploying module '{}' for stream '{}'", moduleLabel, streamName);
 
 		String streamPath = new StreamsPath().setStreamName(streamName)
 				.setModuleType(moduleType)
@@ -252,7 +249,7 @@ public class ContainerServer extends AbstractServer {
 			Stream stream = streamFactory.createStream(streamName,
 					mapBytesUtility.toMap(client.getData().forPath(Paths.build(Paths.STREAMS, streamName))));
 
-			deployModule(stream.getModuleDescriptor(moduleName, moduleType));
+			deployModule(stream.getModuleDescriptor(moduleLabel, moduleType));
 
 			// this indicates that the container has deployed the module
 			client.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
@@ -267,7 +264,7 @@ public class ContainerServer extends AbstractServer {
 		}
 		catch (KeeperException.NodeExistsException e) {
 			// todo: review, this should not happen
-			LOG.info("Module for stream {} already deployed", moduleName, streamName);
+			LOG.info("Module for stream {} already deployed", moduleLabel, streamName);
 		}
 		catch (Exception e) {
 			throw new RuntimeException(e);
@@ -302,18 +299,19 @@ public class ContainerServer extends AbstractServer {
 
 				String streamName = streamsPath.getStreamName();
 				String moduleType = streamsPath.getModuleType();
-//				String moduleName = streamsPath.get
 				String moduleLabel = streamsPath.getModuleLabel();
 
 				undeployModule(moduleLabel, moduleType);
 
-				// todo: remove the deployment path once we remove module name from deployments
-//				String deploymentPath = Paths.build(Paths.DEPLOYMENTS, getId(),
-//						String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel));
-//
-//				LOG.trace("Deleting path: {}",  deploymentPath);
+				String deploymentPath = new DeploymentsPath()
+						.setContainer(getId())
+						.setStreamName(streamName)
+						.setModuleType(moduleType)
+						.setModuleLabel(moduleLabel).build();
 
-//				getClient().delete().forPath(deploymentPath);
+				LOG.trace("Deleting path: {}",  deploymentPath);
+
+				getClient().delete().forPath(deploymentPath);
 			}
 			else {
 				// this watcher is only interested in deletes for the purposes

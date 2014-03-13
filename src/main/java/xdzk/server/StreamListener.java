@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import xdzk.cluster.Container;
 import xdzk.cluster.ContainerRepository;
+import xdzk.core.DeploymentsPath;
 import xdzk.core.MapBytesUtility;
 import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
@@ -207,9 +208,11 @@ public class StreamListener implements PathChildrenCacheListener {
 			for (Container container : stream.getContainerMatcher().match(module, containerRepository)) {
 				String containerName = container.getName();
 				try {
-					client.create().creatingParentsIfNeeded().forPath(
-							Paths.build(Paths.DEPLOYMENTS, containerName,
-									String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
+					client.create().creatingParentsIfNeeded().forPath(new DeploymentsPath()
+							.setContainer(containerName)
+							.setStreamName(streamName)
+							.setModuleType(moduleType)
+							.setModuleLabel(moduleLabel).build());
 
 					mapDeploymentStatus.put(container, new StreamsPath()
 							.setStreamName(streamName)

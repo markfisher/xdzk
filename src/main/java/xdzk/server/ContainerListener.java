@@ -27,6 +27,7 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.util.StringUtils;
 import xdzk.cluster.Container;
 import xdzk.cluster.ContainerRepository;
+import xdzk.core.DeploymentsPath;
 import xdzk.core.MapBytesUtility;
 import xdzk.core.ModuleDescriptor;
 import xdzk.core.ModuleRepository;
@@ -159,12 +160,17 @@ public class ContainerListener implements PathChildrenCacheListener {
 							// amount specified by the module descriptor
 							LOG.info("Deploying module {} to {}", moduleName, container);
 
-							client.create().creatingParentsIfNeeded().forPath(
-									Paths.build(Paths.DEPLOYMENTS, containerName,
-											String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
+							client.create().creatingParentsIfNeeded().forPath(new DeploymentsPath()
+									.setContainer(containerName)
+									.setStreamName(streamName)
+									.setModuleType(moduleType)
+									.setModuleLabel(moduleLabel).build());
 
-							String path = Paths.build(Paths.STREAMS, streamName, moduleType,
-									String.format("%s.%s", moduleName, moduleLabel), containerName);
+							String path = new StreamsPath()
+									.setStreamName(streamName)
+									.setModuleType(moduleType)
+									.setModuleLabel(moduleLabel)
+									.setContainer(containerName).build();
 
 							// todo: make timeout configurable
 							long timeout = System.currentTimeMillis() + 30000;
@@ -194,19 +200,19 @@ public class ContainerListener implements PathChildrenCacheListener {
 	 * @param data    node data for the container that departed
 	 */
 	private void onChildLeft(CuratorFramework client, ChildData data) {
-		// find all of the deployments for the container that left
-		String container = Paths.stripPath(data.getPath());
+		String path = data.getPath();
+		String container = Paths.stripPath(path);
 		LOG.info("Container departed: {}", container);
 
 		try {
 			Map<String, Stream> streamMap = new HashMap<String, Stream>();
-			List<String> deployments = client.getChildren().forPath(Paths.build(Paths.DEPLOYMENTS, container));
+			String containerDeployments = Paths.build(Paths.DEPLOYMENTS, container);
+			List<String> deployments = client.getChildren().forPath(containerDeployments);
 			for (String deployment : deployments) {
-				String[] parts = deployment.split("\\.");
-				String streamName = parts[0];
-				String moduleType = parts[1];
-				String moduleName = parts[2];
-				String moduleLabel = parts[3];
+				DeploymentsPath deploymentsPath = new DeploymentsPath(containerDeployments + '/' + deployment);
+				String streamName = deploymentsPath.getStreamName();
+				String moduleType = deploymentsPath.getModuleType();
+				String moduleLabel = deploymentsPath.getModuleLabel();
 
 				Stream stream = streamMap.get(streamName);
 				if (stream == null) {
@@ -214,11 +220,8 @@ public class ContainerListener implements PathChildrenCacheListener {
 							client.getData().forPath(Paths.build(Paths.STREAMS, streamName))));
 					streamMap.put(streamName, stream);
 				}
-				ModuleDescriptor moduleDescriptor = stream.getModuleDescriptor(moduleName, moduleType);
+				ModuleDescriptor moduleDescriptor = stream.getModuleDescriptor(moduleLabel, moduleType);
 				if (moduleDescriptor.getCount() > 0) {
-					// for now assume that just one redeployment is needed
-
-					// todo: refactor duplicate code from StreamListener
 					Iterator<Container> iterator = stream.getContainerMatcher()
 							.match(moduleDescriptor, containerRepository).iterator();
 
@@ -227,24 +230,25 @@ public class ContainerListener implements PathChildrenCacheListener {
 						String targetName = targetContainer.getName();
 
 						LOG.info("Redeploying module {} for stream {} to container {}",
-								moduleName, streamName, targetName);
+								moduleLabel, streamName, targetName);
 
-						client.create().creatingParentsIfNeeded().forPath(
-								Paths.build(Paths.DEPLOYMENTS, targetName,
-										String.format("%s.%s.%s.%s", streamName, moduleType, moduleName, moduleLabel)));
-
+						client.create().creatingParentsIfNeeded().forPath(new DeploymentsPath()
+								.setContainer(targetName)
+								.setStreamName(streamName)
+								.setModuleType(moduleType)
+								.setModuleLabel(moduleLabel).build()
+								);
 						// todo: not going to bother verifying the redeployment for now
 					}
 					else {
 						// uh oh
-						LOG.warn("No containers available for redeployment of {} for stream {}", moduleName, streamName);
+						LOG.warn("No containers available for redeployment of {} for stream {}", moduleLabel, streamName);
 					}
 				}
 				else {
 					StringBuilder builder = new StringBuilder();
 					String group = moduleDescriptor.getGroup();
-					builder.append("Module '").append(moduleName).append("' with label '")
-							.append(moduleLabel).append("' is targeted to all containers");
+					builder.append("Module '").append(moduleLabel).append("' is targeted to all containers");
 					if (StringUtils.hasText(group)) {
 						builder.append(" belonging to group '").append(group).append('\'');
 					}

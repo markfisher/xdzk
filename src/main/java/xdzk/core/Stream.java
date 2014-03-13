@@ -168,16 +168,16 @@ public class Stream {
 	}
 
 	/**
-	 * Return the module descriptor for the given module name and type.
+	 * Return the module descriptor for the given module label and type.
 	 *
-	 * @param moduleName  module name
+	 * @param moduleLabel  module label
 	 * @param moduleType  module type
 	 *
 	 * @return module descriptor
 	 *
 	 * @throws IllegalArgumentException if the module name/type cannot be found
 	 */
-	public ModuleDescriptor getModuleDescriptor(String moduleName, String moduleType) {
+	public ModuleDescriptor getModuleDescriptor(String moduleLabel, String moduleType) {
 		Module.Type type = Module.Type.valueOf(moduleType.toUpperCase());
 		ModuleDescriptor moduleDescriptor = null;
 		switch (type) {
@@ -189,14 +189,14 @@ public class Stream {
 				break;
 			case PROCESSOR:
 				for (ModuleDescriptor processor : processors) {
-					if (processor.getModule().getName().equals(moduleName)) {
+					if (processor.getLabel().equals(moduleLabel)) {
 						moduleDescriptor = processor;
 						break;
 					}
 				}
 		}
-		if (moduleDescriptor == null || !moduleName.equals(moduleDescriptor.getModule().getName())) {
-			throw new IllegalArgumentException(String.format("Module %s of type %s not found", moduleName, moduleType));
+		if (moduleDescriptor == null || !moduleLabel.equals(moduleDescriptor.getLabel())) {
+			throw new IllegalArgumentException(String.format("Module %s of type %s not found", moduleLabel, moduleType));
 		}
 
 		return moduleDescriptor;

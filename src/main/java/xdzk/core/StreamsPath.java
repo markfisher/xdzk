@@ -31,7 +31,7 @@ import xdzk.curator.Paths;
  * It can also be used to build a path, for example:
  * <p>
  * <code>
- * StreamsPath streamsPath = new StreamsPath().setStreamName();
+ * StreamsPath streamsPath = new StreamsPath().setStreamName("my-stream");
  * assertEquals("/streams/my-stream", streamsPath.build());
  * </code>
  * </p>
