@@ -154,7 +154,7 @@ public class ContainerServer extends AbstractServer {
 		ModuleDescriptor.Key key = new ModuleDescriptor.Key(Module.Type.valueOf(moduleType.toUpperCase()), moduleLabel);
 		ModuleDescriptor descriptor = mapDeployedModules.get(key);
 		if (descriptor == null) {
-			LOG.info("Module {} already undeployed", moduleLabel);
+			LOG.trace("Module {} already undeployed", moduleLabel);
 		}
 		else {
 			LOG.info("Undeploying module {}", descriptor);
@@ -277,10 +277,23 @@ public class ContainerServer extends AbstractServer {
 	 * @param client  curator client
 	 * @param data    module data
 	 */
-	private void onChildRemoved(CuratorFramework client, ChildData data) {
-		// todo: review
-		// module undeployment only handled when removing the module in
-		// the stream, not under /xd/deployments
+	private void onChildRemoved(CuratorFramework client, ChildData data) throws Exception {
+		DeploymentsPath deploymentsPath = new DeploymentsPath(data.getPath());
+		String moduleType = deploymentsPath.getModuleType();
+		String moduleLabel = deploymentsPath.getModuleLabel();
+
+		undeployModule(moduleLabel, moduleType);
+
+		String streamsPath = new StreamsPath()
+				.setStreamName(deploymentsPath.getStreamName())
+				.setModuleType(moduleType)
+				.setModuleLabel(moduleLabel)
+				.setContainer(getId()).build();
+
+		if (client.checkExists().forPath(streamsPath) != null) {
+			LOG.trace("Deleting path: {}",  streamsPath);
+			client.delete().forPath(streamsPath);
+		}
 	}
 
 	/**
@@ -309,9 +322,11 @@ public class ContainerServer extends AbstractServer {
 						.setModuleType(moduleType)
 						.setModuleLabel(moduleLabel).build();
 
-				LOG.trace("Deleting path: {}",  deploymentPath);
-
-				getClient().delete().forPath(deploymentPath);
+				CuratorFramework client = getClient();
+				if (client.checkExists().forPath(deploymentPath) != null) {
+					LOG.trace("Deleting path: {}",  deploymentPath);
+					getClient().delete().forPath(deploymentPath);
+				}
 			}
 			else {
 				// this watcher is only interested in deletes for the purposes
