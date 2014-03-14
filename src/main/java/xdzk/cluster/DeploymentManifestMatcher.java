@@ -29,12 +29,23 @@ import java.util.List;
 
 /**
  * Implementation of {@link ContainerMatcher} that returns a collection of
- * containers to deploy a {@link ModuleDescriptor} to. If the manifest specifies
- * a count of 0 for a module, all available containers are returned.
- * Otherwise a collection of at least one {@link Container} is returned
- * for module deployment. An attempt at round robin distribution will be
- * made (but not guaranteed). If a group for a module is specified,
- * only containers that belong to that group will be returned.
+ * containers to deploy a {@link ModuleDescriptor} to. This implementation
+ * examines the deployment manifest for a stream to determine the preferences
+ * for each individual module. The deployment manifest can (optionally)
+ * specify two preferences: <em>group</em> and <em>count</em>.
+ * <p/>
+ * A group indicates that a module should only be deployed to a
+ * container that belongs to a group. If a group preference is not
+ * indicated, any container can deploy the module.
+ * <p/>
+ * If a count for a module is not specified, by default one instance
+ * of that module will be deployed to one container. A count of 0
+ * indicates that all containers in its specified group will deploy
+ * it. If no group is specified, all containers will deploy the module.
+ * <p/>
+ * In cases where all containers are not deploying a module, an attempt
+ * at container round robin distribution for module deployments will
+ * be made (but not guaranteed).
  *
  * @author Patrick Peralta
  */

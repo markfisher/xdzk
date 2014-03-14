@@ -54,6 +54,9 @@ public class ModuleDescriptor {
 
 	/**
 	 * Number of container instances this module should be deployed to.
+	 * A value of 0 indicates that this module should be deployed to
+	 * all containers in the {@link #group}. If {@code group} is null,
+	 * this module should be deployed to all containers.
 	 */
 	private final int count;
 
@@ -110,13 +113,13 @@ public class ModuleDescriptor {
 	 *
 	 * @return order of processing for this module
 	 */
-
 	public int getIndex() {
 		return index;
 	}
 
 	/**
 	 * Return the group of containers this module should be deployed to.
+	 * This may return {@code null}.
 	 *
 	 * @return container group name
 	 */
@@ -126,6 +129,9 @@ public class ModuleDescriptor {
 
 	/**
 	 * Return the number of container instances this module should be deployed to.
+	 * A value of 0 indicates that this module should be deployed to
+	 * all containers in the {@link #group}. If {@code group} is null,
+	 * this module should be deployed to all containers.
 	 *
 	 * @return number of container instances
 	 */

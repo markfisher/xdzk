@@ -68,7 +68,7 @@ public class StreamFactory {
 							: i == modules.length - 1 ? Module.Type.SINK
 							: Module.Type.PROCESSOR);
 
-			builder.addModule(module, label);
+			builder.addModule(label, module);
 		}
 
 		return builder.build();

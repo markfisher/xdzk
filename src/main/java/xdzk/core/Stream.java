@@ -348,11 +348,11 @@ public class Stream {
 		 * modules will be added to the stream in the order
 		 * they are added to this builder.
 		 *
-		 * @param module  module to add
 		 * @param label   label for this module
+		 * @param module  module to add
 		 * @return this builder
 		 */
-		public Builder addModule(Module module, String label) {
+		public Builder addModule(String label, Module module) {
 			if (modules.containsKey(label)) {
 				throw new IllegalArgumentException(String.format("Label %s already in use", label));
 			}
